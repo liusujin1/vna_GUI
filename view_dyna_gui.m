@@ -191,9 +191,53 @@ lblStatus = uicontrol('Parent', panel, 'Style', 'text', ...
     'Position', [15 340 330 40]);
 
 % 右侧三幅图的类型选择与导出按钮
+% 左侧折叠分组状态（会话内保持）
+isDataGroupExpanded = true;
+isMainGroupExpanded = false;
+isPlotGroupExpanded = true;
+
+% 左侧折叠分组：标题按钮 + 内容面板（MATLAB 2016 compatible）
+btnDataGroup = uicontrol('Parent', panel, 'Style', 'togglebutton', ...
+    'String', '[-] Data', ...
+    'Value', 1, ...
+    'Callback', @onToggleDataGroup);
+grpData = uipanel('Parent', panel, 'BorderType', 'line', 'Title', '');
+
+btnMainGroup = uicontrol('Parent', panel, 'Style', 'togglebutton', ...
+    'String', '[+] Main Processing', ...
+    'Value', 0, ...
+    'Callback', @onToggleMainGroup);
+grpMainProc = uipanel('Parent', panel, 'BorderType', 'line', 'Title', '');
+
+btnPlotGroup = uicontrol('Parent', panel, 'Style', 'togglebutton', ...
+    'String', '[-] Plot', ...
+    'Value', 1, ...
+    'Callback', @onTogglePlotGroup);
+grpPlot = uipanel('Parent', panel, 'BorderType', 'line', 'Title', '');
+
+set([grpData, grpMainProc, grpPlot], 'Units', 'pixels');
+
+set([btnLoad, btnLoadFolder, edtFile, lblDataList, lstData, lblRename, edtRename, ...
+    lblScale, edtScale, btnDeleteSelected], 'Parent', grpData);
+
+set([lblFs, edtFs, lblTStart, edtTStart, lblTEnd, edtTEnd, lblPsdSource, ddPsdSource, ...
+    lblFilter, chkLow, chkHigh, lblLowCutoff, edtLowCutoff, lblHighCutoff, edtHighCutoff, ...
+    lblOrder, edtOrder, btnReset], 'Parent', grpMainProc);
+set(btnReset, 'String', 'Reset');
+
+set([btnPlot, btnHold, btnClear, lblStatus], 'Parent', grpPlot);
+
 tabRight = uitabgroup('Parent', fig, 'Units', 'pixels', 'Position', [390 15 1095 860]);
 tabMain = uitab('Parent', tabRight, 'Title', 'Main');
 tabFoundation = uitab('Parent', tabRight, 'Title', 'Foundation');
+try
+    set(tabRight, 'SelectionChangedFcn', @onTabChanged);
+catch
+    try
+        set(tabRight, 'SelectionChangeFcn', @onTabChanged);
+    catch
+    end
+end
 
 lblSel1 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'String', 'Plot 1:', ...
@@ -368,103 +412,215 @@ onResize();
         end
         margin = 15;
         gapLR = 15;
-        titleSafe = 38;
+        titleSafe = 26;
 
         % Left control area width follows window size with limits.
-        leftW = max(300, min(360, round(fw * 0.22)));
+        leftW = max(300, min(380, round(fw * 0.24)));
         set(panel, 'Position', [margin, margin, leftW, max(640, fh - 2 * margin)]);
 
         panelPos = get(panel, 'Position');
         pw = panelPos(3);
         ph = panelPos(4);
-        xPad = 15;
+        xPad = 8;
+        yGap = 6;
+        headerH = 26;
+        bodyW = max(200, pw - 2 * xPad);
+        yCursor = ph - titleSafe;
 
-        % Top row
-        topY = ph - titleSafe - 34;
-        loadW = 100; rowH = 30;
-        fsW = 70;
+        mainGroupVisible = ~isFoundationTabSelected(tabRight, tabFoundation);
+        if mainGroupVisible
+            set(btnMainGroup, 'Visible', 'on');
+        else
+            set(btnMainGroup, 'Visible', 'off');
+            set(grpMainProc, 'Visible', 'off');
+        end
 
-        set(btnLoad, 'Position', [xPad, topY, loadW, rowH]);
-        set(btnLoadFolder, 'Position', [xPad, topY - 34, loadW, rowH]);
-        fsX = pw - xPad - fsW;
-        fsLblX = fsX - 55;
+        set(btnDataGroup, 'String', getGroupTitle('Data', isDataGroupExpanded), ...
+            'Value', double(isDataGroupExpanded));
+        set(btnMainGroup, 'String', getGroupTitle('Main Processing', isMainGroupExpanded), ...
+            'Value', double(isMainGroupExpanded));
+        set(btnPlotGroup, 'String', getGroupTitle('Plot', isPlotGroupExpanded), ...
+            'Value', double(isPlotGroupExpanded));
 
-        set(edtFs, 'Position', [fsX, topY, fsW, rowH]);
-        set(lblFs, 'Position', [fsLblX, topY + 4, 55, 22]);
+        visibleCount = 2 + double(mainGroupVisible);
+        innerAvailH = max(260, ph - titleSafe - 8);
+        bodyBudget = innerAvailH - visibleCount * headerH - (visibleCount + 1) * yGap;
+        if bodyBudget < 0
+            bodyBudget = 0;
+        end
 
-        fileY = topY - 78;
-        set(edtFile, 'Position', [xPad, fileY, pw - 2 * xPad, 30]);
-        listW = pw - 2 * xPad;
+        minDataH = 120;
+        minMainH = 140;
+        minPlotH = 90;
+        dataH = 0;
+        mainH = 0;
+        plotH = 0;
+        if mainGroupVisible && isMainGroupExpanded
+            mainH = 186;
+        end
+        if isPlotGroupExpanded
+            plotH = 120;
+        end
+        if isDataGroupExpanded
+            dataH = bodyBudget - mainH - plotH;
+            if dataH < minDataH
+                need = minDataH - dataH;
+                if mainH > 0
+                    cut = min(need, max(0, mainH - minMainH));
+                    mainH = mainH - cut;
+                    need = need - cut;
+                end
+                if need > 0 && plotH > 0
+                    cut = min(need, max(0, plotH - minPlotH));
+                    plotH = plotH - cut;
+                end
+                dataH = max(90, bodyBudget - mainH - plotH);
+            end
+        end
 
-        rangeY = fileY - 38;
-        tLabelW = 88;
-        tEditW = floor((listW - 2 * tLabelW - 15) / 2);
-        set(lblTStart, 'Position', [xPad, rangeY + 4, tLabelW, 22]);
-        set(edtTStart, 'Position', [xPad + tLabelW, rangeY, tEditW, 30]);
-        x2 = xPad + tLabelW + tEditW + 15;
-        set(lblTEnd, 'Position', [x2, rangeY + 4, tLabelW - 10, 22]);
-        set(edtTEnd, 'Position', [x2 + tLabelW - 10, rangeY, tEditW, 30]);
+        % Data group
+        set(btnDataGroup, 'Position', [xPad, yCursor - headerH, bodyW, headerH]);
+        yCursor = yCursor - headerH;
+        if isDataGroupExpanded
+            set(grpData, 'Visible', 'on', 'Position', [xPad, yCursor - dataH, bodyW, dataH]);
+            yCursor = yCursor - dataH - yGap;
+        else
+            set(grpData, 'Visible', 'off', 'Position', [xPad, yCursor, bodyW, 1]);
+            yCursor = yCursor - yGap;
+        end
 
-        psdSrcY = rangeY - 34;
-        psdLabelW = 72;
-        set(lblPsdSource, 'Position', [xPad, psdSrcY + 2, psdLabelW, 22]);
-        set(ddPsdSource, 'Position', [xPad + psdLabelW + 4, psdSrcY, listW - psdLabelW - 4, 24]);
+        % Main processing group (shown only in Main tab)
+        if mainGroupVisible
+            set(btnMainGroup, 'Position', [xPad, yCursor - headerH, bodyW, headerH]);
+            yCursor = yCursor - headerH;
+            if isMainGroupExpanded
+                set(grpMainProc, 'Visible', 'on', 'Position', [xPad, yCursor - mainH, bodyW, mainH]);
+                yCursor = yCursor - mainH - yGap;
+            else
+                set(grpMainProc, 'Visible', 'off', 'Position', [xPad, yCursor, bodyW, 1]);
+                yCursor = yCursor - yGap;
+            end
+        end
 
-        listLabelY = psdSrcY - 36;
-        listH = max(90, min(180, ph - 570));
-        listY = listLabelY - 6 - listH;
+        % Plot group
+        set(btnPlotGroup, 'Position', [xPad, yCursor - headerH, bodyW, headerH]);
+        yCursor = yCursor - headerH;
+        if isPlotGroupExpanded
+            set(grpPlot, 'Visible', 'on', 'Position', [xPad, max(6, yCursor - plotH), bodyW, plotH]);
+        else
+            set(grpPlot, 'Visible', 'off', 'Position', [xPad, max(6, yCursor), bodyW, 1]);
+        end
 
-        set(lstData, 'Position', [xPad, listY, listW, listH]);
-        set(lblDataList, 'Position', [xPad, listLabelY, 180, 22]);
+        % Layout inside Data group
+        if isDataGroupExpanded
+            gw = bodyW;
+            gh = dataH;
+            gx = 10;
+            gy = gh - 8;
+            innerW = max(150, gw - 2 * gx);
+            rowH = 28;
+            rowGap = 6;
 
-        renameY = listY - 38;
-        renameLabelW = 55;
-        scaleLabelW = 38;
-        scaleEditW = 54;
-        renameGap = 8;
-        renameEditW = max(80, listW - renameLabelW - scaleLabelW - scaleEditW - 2 * renameGap);
-        set(lblRename, 'Position', [xPad, renameY + 4, renameLabelW, 22]);
-        set(edtRename, 'Position', [xPad + renameLabelW + 5, renameY, renameEditW, 30]);
-        scaleX = xPad + renameLabelW + 5 + renameEditW + renameGap;
-        set(lblScale, 'Position', [scaleX, renameY + 4, scaleLabelW, 22]);
-        set(edtScale, 'Position', [scaleX + scaleLabelW + 4, renameY, scaleEditW, 30]);
+            loadW = floor((innerW - rowGap) / 2);
+            set(btnLoad, 'Position', [gx, gy - rowH, loadW, rowH]);
+            set(btnLoadFolder, 'Position', [gx + loadW + rowGap, gy - rowH, innerW - loadW - rowGap, rowH]);
+            gy = gy - rowH - rowGap;
 
-        actionY = renameY - 38;
-        set(btnDeleteSelected, 'Position', [xPad, actionY, listW, 30]);
+            set(edtFile, 'Position', [gx, gy - rowH, innerW, rowH]);
+            gy = gy - rowH - rowGap;
 
-        filterY = actionY - 44;
-        set(lblFilter, 'Position', [xPad, filterY + 4, 50, 22]);
-        set(chkLow, 'Position', [xPad + 55, filterY + 2, 85, 22]);
-        set(chkHigh, 'Position', [xPad + 145, filterY + 2, 90, 22]);
+            set(lblDataList, 'Position', [gx, gy - 20, innerW, 20]);
+            gy = gy - 20 - rowGap;
 
-        cutoffY = filterY - 40;
-        colGap = 10;
-        colW = floor((listW - colGap) / 2);
-        leftColX = xPad;
-        rightColX = xPad + colW + colGap;
-        cutoffLabelW = 52;
-        cutoffEditW = max(56, colW - cutoffLabelW - 4);
-        set(lblLowCutoff, 'Position', [leftColX, cutoffY + 4, cutoffLabelW, 22]);
-        set(edtLowCutoff, 'Position', [leftColX + cutoffLabelW + 4, cutoffY, cutoffEditW, 30]);
-        set(lblHighCutoff, 'Position', [rightColX, cutoffY + 4, cutoffLabelW, 22]);
-        set(edtHighCutoff, 'Position', [rightColX + cutoffLabelW + 4, cutoffY, cutoffEditW, 30]);
+            renameH = 28;
+            deleteH = 28;
+            listH = gy - (renameH + rowGap + deleteH + 8);
+            listH = max(55, listH);
+            set(lstData, 'Position', [gx, gy - listH, innerW, listH]);
+            gy = gy - listH - rowGap;
 
-        orderY = cutoffY - 40;
-        set(lblOrder, 'Position', [xPad, orderY + 4, 45, 22]);
-        set(edtOrder, 'Position', [xPad + 45, orderY, 60, 30]);
+            renameLabelW = 52;
+            factorLabelW = 42;
+            factorEditW = 52;
+            renameGap = 6;
+            renameW = max(72, innerW - renameLabelW - factorLabelW - factorEditW - 3 * renameGap);
+            set(lblRename, 'Position', [gx, gy - renameH + 4, renameLabelW, 22]);
+            set(edtRename, 'Position', [gx + renameLabelW + renameGap, gy - renameH, renameW, renameH]);
+            fx = gx + renameLabelW + renameGap + renameW + renameGap;
+            set(lblScale, 'Position', [fx, gy - renameH + 4, factorLabelW, 22]);
+            set(edtScale, 'Position', [fx + factorLabelW + renameGap, gy - renameH, factorEditW, renameH]);
+            gy = gy - renameH - rowGap;
 
-        btnY = orderY - 50;
-        btnGap = 10;
-        btnW = floor((listW - btnGap) / 2);
-        btnX1 = xPad;
-        btnX2 = xPad + btnW + btnGap;
-        btnY2 = btnY - 38;
-        set(btnPlot, 'Position', [btnX1, btnY, btnW, 32]);
-        set(btnHold, 'Position', [btnX2, btnY, btnW, 32]);
-        set(btnReset, 'Position', [btnX1, btnY2, btnW, 32]);
-        set(btnClear, 'Position', [btnX2, btnY2, btnW, 32]);
+            set(btnDeleteSelected, 'Position', [gx, gy - deleteH, innerW, deleteH]);
+        end
 
-        set(lblStatus, 'Position', [xPad, btnY2 - 44, pw - 2 * xPad, 36]);
+        % Layout inside Main processing group
+        if mainGroupVisible && isMainGroupExpanded
+            gw = bodyW;
+            gh = mainH;
+            gx = 10;
+            gy = gh - 8;
+            innerW = max(150, gw - 2 * gx);
+            rowH = 24;
+            rowGap = 4;
+
+            fsEditW = 68;
+            set(lblFs, 'Position', [gx, gy - rowH + 4, 55, 22]);
+            set(edtFs, 'Position', [innerW + gx - fsEditW, gy - rowH, fsEditW, rowH]);
+            gy = gy - rowH - rowGap;
+
+            tLabelW = 86;
+            tGap = 8;
+            tEditW = floor((innerW - 2 * tLabelW - tGap) / 2);
+            set(lblTStart, 'Position', [gx, gy - rowH + 4, tLabelW, 22]);
+            set(edtTStart, 'Position', [gx + tLabelW, gy - rowH, tEditW, rowH]);
+            x2 = gx + tLabelW + tEditW + tGap;
+            set(lblTEnd, 'Position', [x2, gy - rowH + 4, tLabelW - 8, 22]);
+            set(edtTEnd, 'Position', [x2 + tLabelW - 8, gy - rowH, tEditW, rowH]);
+            gy = gy - rowH - rowGap;
+
+            psdLabelW = 72;
+            set(lblPsdSource, 'Position', [gx, gy - rowH + 4, psdLabelW, 22]);
+            set(ddPsdSource, 'Position', [gx + psdLabelW + 4, gy - rowH + 1, innerW - psdLabelW - 4, 24]);
+            gy = gy - rowH - rowGap;
+
+            resetW = 58;
+            set(lblFilter, 'Position', [gx, gy - rowH + 4, 45, 22]);
+            set(chkLow, 'Position', [gx + 48, gy - rowH + 2, 82, 22]);
+            set(chkHigh, 'Position', [gx + 130, gy - rowH + 2, 86, 22]);
+            set(btnReset, 'Position', [gx + innerW - resetW, gy - rowH + 1, resetW, 24]);
+            gy = gy - rowH - rowGap;
+
+            colGap = 8;
+            colW = floor((innerW - colGap) / 2);
+            cutoffLabelW = 50;
+            cutoffEditW = max(48, colW - cutoffLabelW - 4);
+            set(lblLowCutoff, 'Position', [gx, gy - rowH + 4, cutoffLabelW, 22]);
+            set(edtLowCutoff, 'Position', [gx + cutoffLabelW + 4, gy - rowH, cutoffEditW, rowH]);
+            rightColX = gx + colW + colGap;
+            set(lblHighCutoff, 'Position', [rightColX, gy - rowH + 4, cutoffLabelW, 22]);
+            set(edtHighCutoff, 'Position', [rightColX + cutoffLabelW + 4, gy - rowH, cutoffEditW, rowH]);
+            gy = gy - rowH - rowGap;
+
+            set(lblOrder, 'Position', [gx, gy - rowH + 4, 45, 22]);
+            set(edtOrder, 'Position', [gx + 45, gy - rowH, 60, rowH]);
+        end
+
+        % Layout inside Plot group
+        if isPlotGroupExpanded
+            gw = bodyW;
+            gh = plotH;
+            gx = 10;
+            gy = gh - 8;
+            innerW = max(150, gw - 2 * gx);
+            btnGap = 8;
+            btnH = 30;
+            btnW = floor((innerW - 2 * btnGap) / 3);
+            set(btnPlot, 'Position', [gx, gy - btnH, btnW, btnH]);
+            set(btnHold, 'Position', [gx + btnW + btnGap, gy - btnH, btnW, btnH]);
+            set(btnClear, 'Position', [gx + 2 * (btnW + btnGap), gy - btnH, innerW - 2 * (btnW + btnGap), btnH]);
+            set(lblStatus, 'Position', [gx, gy - btnH - 36, innerW, 30]);
+        end
 
         % Right side tab group area.
         rightXFig = margin + leftW + gapLR;
@@ -575,6 +731,33 @@ onResize();
     end
 
     % 加载数据文件（支持多选），并重建“数据项列表”
+    function txt = getGroupTitle(baseName, expanded)
+        if expanded
+            txt = ['[-] ' baseName];
+        else
+            txt = ['[+] ' baseName];
+        end
+    end
+
+    function onToggleDataGroup(~, ~)
+        isDataGroupExpanded = logical(get(btnDataGroup, 'Value'));
+        onResize();
+    end
+
+    function onToggleMainGroup(~, ~)
+        isMainGroupExpanded = logical(get(btnMainGroup, 'Value'));
+        onResize();
+    end
+
+    function onTogglePlotGroup(~, ~)
+        isPlotGroupExpanded = logical(get(btnPlotGroup, 'Value'));
+        onResize();
+    end
+
+    function onTabChanged(~, ~)
+        onResize();
+    end
+
     function onLoadFile(~, ~)
         app = getappdata(fig, 'app');
         startDir = app.lastOpenDir;

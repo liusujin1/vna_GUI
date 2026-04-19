@@ -1,0 +1,21 @@
+# IDE
+.idea/
+.vs/
+
+# MATLAB autosave/temp
+*.asv
+*.m~
+slprj/
+codegen/
+*.mex*
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Local data files
+*.vna
+
+# OS artifacts
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1621 @@
+function view_dyna_gui()
+% GUI for vibration data (.vna/.mat/.txt/.dat/.csv/.xlsx)
+% - channel single/multi selection
+% - plot button drives time/PSD/transmissibility
+% - optional low-pass/high-pass filtering in time domain
+
+screenSz = get(0, 'ScreenSize');
+figW = max(1220, min(round(screenSz(3) * 0.80), 1420));
+figH = max(760, min(round(screenSz(4) * 0.76), 820));
+figX = max(20, round((screenSz(3) - figW) / 2));
+figY = max(20, round((screenSz(4) - figH) / 2));
+
+fig = figure( ...
+    'Name', 'Vibration Viewer', ...
+    'NumberTitle', 'off', ...
+    'Position', [figX figY figW figH], ...
+    'Color', get(0, 'DefaultUicontrolBackgroundColor'), ...
+    'MenuBar', 'figure', ...
+    'ToolBar', 'figure', ...
+    'Resize', 'on');
+app = initAppState();
+app.lastOpenDir = pwd;
+setappdata(fig, 'app', app);
+
+panel = uipanel('Parent', fig, 'Title', 'Controls', 'Units', 'pixels', 'Position', [15 15 360 890]);
+
+btnLoad = uicontrol('Parent', panel, 'Style', 'pushbutton', ...
+    'String', 'Load Files', ...
+    'Position', [15 848 100 30], ...
+    'Callback', @onLoadFile);
+
+edtFile = uicontrol('Parent', panel, 'Style', 'edit', ...
+    'Enable', 'inactive', ...
+    'HorizontalAlignment', 'left', ...
+    'BackgroundColor', 'w', ...
+    'String', 'No file loaded', ...
+    'Position', [15 810 330 30]);
+
+lblFs = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'Fs (Hz):', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [130 852 55 22]);
+edtFs = uicontrol('Parent', panel, 'Style', 'edit', ...
+    'String', '1000', ...
+    'BackgroundColor', 'w', ...
+    'Position', [175 848 70 30]);
+
+lblDataList = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'Data List (File+Channel):', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [15 775 180 22]);
+lstData = uicontrol('Parent', panel, 'Style', 'listbox', ...
+    'Max', 2, 'Min', 0, ...
+    'String', {' '}, ...
+    'Value', 1, ...
+    'BackgroundColor', 'w', ...
+    'Callback', @onDataSelectionChanged, ...
+    'Position', [15 610 330 165]);
+
+lblFilter = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'Filter:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [15 565 45 22]);
+chkLow = uicontrol('Parent', panel, 'Style', 'checkbox', ...
+    'String', 'Low-pass', ...
+    'Value', 0, ...
+    'Position', [70 560 85 22]);
+chkHigh = uicontrol('Parent', panel, 'Style', 'checkbox', ...
+    'String', 'High-pass', ...
+    'Value', 0, ...
+    'Position', [160 560 90 22]);
+
+lblLowCutoff = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'LP (Hz):', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [15 525 55 22]);
+edtLowCutoff = uicontrol('Parent', panel, 'Style', 'edit', ...
+    'String', '100', ...
+    'BackgroundColor', 'w', ...
+    'Position', [70 520 90 30]);
+
+lblHighCutoff = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'HP (Hz):', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [175 525 55 22]);
+edtHighCutoff = uicontrol('Parent', panel, 'Style', 'edit', ...
+    'String', '5', ...
+    'BackgroundColor', 'w', ...
+    'Position', [230 520 90 30]);
+
+lblOrder = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'Order:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [15 485 45 22]);
+edtOrder = uicontrol('Parent', panel, 'Style', 'edit', ...
+    'String', '4', ...
+    'BackgroundColor', 'w', ...
+    'Position', [60 480 60 30]);
+
+btnPlot = uicontrol('Parent', panel, 'Style', 'pushbutton', ...
+    'String', 'Plot', ...
+    'Position', [15 430 100 30], ...
+    'Callback', @onPlot);
+
+btnHold = uicontrol('Parent', panel, 'Style', 'togglebutton', ...
+    'String', 'Hold', ...
+    'Value', 0, ...
+    'Position', [125 430 90 30], ...
+    'Callback', @onHoldChanged);
+
+btnReset = uicontrol('Parent', panel, 'Style', 'pushbutton', ...
+    'String', 'Reset Filter', ...
+    'Position', [225 430 100 30], ...
+    'Callback', @onResetFilter);
+
+btnClear = uicontrol('Parent', panel, 'Style', 'pushbutton', ...
+    'String', 'Clear Plots', ...
+    'Position', [335 430 110 30], ...
+    'Callback', @onClearPlots);
+
+btnDeleteSelected = uicontrol('Parent', panel, 'Style', 'pushbutton', ...
+    'String', 'Delete Selected', ...
+    'Position', [15 575 330 30], ...
+    'Callback', @onDeleteSelectedFiles);
+
+lblRename = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'Rename:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [15 540 55 22]);
+
+edtRename = uicontrol('Parent', panel, 'Style', 'edit', ...
+    'String', '', ...
+    'BackgroundColor', 'w', ...
+    'HorizontalAlignment', 'left', ...
+    'Callback', @onRenameEdited, ...
+    'Position', [70 536 275 30]);
+
+lblScale = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'Factor:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [250 540 40 22]);
+
+edtScale = uicontrol('Parent', panel, 'Style', 'edit', ...
+    'String', '1', ...
+    'BackgroundColor', 'w', ...
+    'HorizontalAlignment', 'left', ...
+    'Callback', @onScaleEdited, ...
+    'Position', [292 536 53 30]);
+
+lblStatus = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'Status: ready', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [15 340 330 40]);
+
+lblSel1 = uicontrol('Parent', fig, 'Style', 'text', ...
+    'String', 'Plot 1:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [390 870 45 22]);
+ddSel1 = uicontrol('Parent', fig, 'Style', 'popupmenu', ...
+    'String', {'Time', 'PSD', 'Trans'}, ...
+    'Value', 1, ...
+    'BackgroundColor', 'w', ...
+    'Position', [440 868 110 24]);
+btnFig1 = uicontrol('Parent', fig, 'Style', 'pushbutton', ...
+    'String', 'Figure', ...
+    'Position', [556 866 62 26]);
+
+lblSel2 = uicontrol('Parent', fig, 'Style', 'text', ...
+    'String', 'Plot 2:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [390 620 45 22]);
+ddSel2 = uicontrol('Parent', fig, 'Style', 'popupmenu', ...
+    'String', {'Time', 'PSD', 'Trans'}, ...
+    'Value', 2, ...
+    'BackgroundColor', 'w', ...
+    'Position', [440 618 110 24]);
+btnFig2 = uicontrol('Parent', fig, 'Style', 'pushbutton', ...
+    'String', 'Figure', ...
+    'Position', [556 616 62 26]);
+
+lblSel3 = uicontrol('Parent', fig, 'Style', 'text', ...
+    'String', 'Plot 3:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [390 370 45 22]);
+ddSel3 = uicontrol('Parent', fig, 'Style', 'popupmenu', ...
+    'String', {'Time', 'PSD', 'Trans'}, ...
+    'Value', 3, ...
+    'BackgroundColor', 'w', ...
+    'Position', [440 368 110 24]);
+btnFig3 = uicontrol('Parent', fig, 'Style', 'pushbutton', ...
+    'String', 'Figure', ...
+    'Position', [556 366 62 26]);
+
+axMain1 = axes('Parent', fig, 'Units', 'pixels', 'Position', [390 645 1095 215], 'Box', 'on');
+title(axMain1, 'Time Domain');
+xlabel(axMain1, 'Time (s)');
+ylabel(axMain1, 'Acceleration (m/s^2)');
+grid(axMain1, 'on');
+
+axMain2 = axes('Parent', fig, 'Units', 'pixels', 'Position', [390 395 1095 215], 'Box', 'on');
+title(axMain2, 'PSD');
+xlabel(axMain2, 'Frequency (Hz)');
+ylabel(axMain2, '(m/s^2)^2/Hz');
+set(axMain2, 'XScale', 'log', 'YScale', 'log');
+grid(axMain2, 'on');
+
+axMain3 = axes('Parent', fig, 'Units', 'pixels', 'Position', [390 145 1095 215], 'Box', 'on');
+title(axMain3, 'Transmissibility (dB)');
+xlabel(axMain3, 'Frequency (Hz)');
+ylabel(axMain3, 'dB');
+set(axMain3, 'XScale', 'log', 'YScale', 'linear');
+grid(axMain3, 'on');
+
+set(btnFig1, 'Callback', @(~, ~) onOpenAxisFigure(axMain1, 'Plot 1'));
+set(btnFig2, 'Callback', @(~, ~) onOpenAxisFigure(axMain2, 'Plot 2'));
+set(btnFig3, 'Callback', @(~, ~) onOpenAxisFigure(axMain3, 'Plot 3'));
+
+set(fig, 'ResizeFcn', @onResize);
+onResize();
+
+    function onResize(~, ~)
+        figPos = get(fig, 'Position');
+        fw = figPos(3);
+        fh = figPos(4);
+        minW = 1220;
+        minH = 760;
+        if fw < minW || fh < minH
+            figPos(3) = max(fw, minW);
+            figPos(4) = max(fh, minH);
+            set(fig, 'Position', figPos);
+            fw = figPos(3);
+            fh = figPos(4);
+        end
+        margin = 15;
+        gapLR = 15;
+        titleSafe = 38;
+
+        % Left control area width follows window size with limits.
+        leftW = max(300, min(360, round(fw * 0.22)));
+        set(panel, 'Position', [margin, margin, leftW, max(640, fh - 2 * margin)]);
+
+        panelPos = get(panel, 'Position');
+        pw = panelPos(3);
+        ph = panelPos(4);
+        xPad = 15;
+
+        % Top row
+        topY = ph - titleSafe - 34;
+        loadW = 100; rowH = 30;
+        fsW = 70;
+
+        set(btnLoad, 'Position', [xPad, topY, loadW, rowH]);
+        fsX = pw - xPad - fsW;
+        fsLblX = fsX - 55;
+
+        set(edtFs, 'Position', [fsX, topY, fsW, rowH]);
+        set(lblFs, 'Position', [fsLblX, topY + 4, 55, 22]);
+
+        fileY = topY - 44;
+        set(edtFile, 'Position', [xPad, fileY, pw - 2 * xPad, 30]);
+
+        listLabelY = fileY - 54;
+        listH = max(110, min(240, ph - 500));
+        listY = listLabelY - 6 - listH;
+        listW = pw - 2 * xPad;
+
+        set(lstData, 'Position', [xPad, listY, listW, listH]);
+        set(lblDataList, 'Position', [xPad, listLabelY, 180, 22]);
+
+        renameY = listY - 38;
+        renameLabelW = 55;
+        scaleLabelW = 38;
+        scaleEditW = 54;
+        renameGap = 8;
+        renameEditW = max(80, listW - renameLabelW - scaleLabelW - scaleEditW - 2 * renameGap);
+        set(lblRename, 'Position', [xPad, renameY + 4, renameLabelW, 22]);
+        set(edtRename, 'Position', [xPad + renameLabelW + 5, renameY, renameEditW, 30]);
+        scaleX = xPad + renameLabelW + 5 + renameEditW + renameGap;
+        set(lblScale, 'Position', [scaleX, renameY + 4, scaleLabelW, 22]);
+        set(edtScale, 'Position', [scaleX + scaleLabelW + 4, renameY, scaleEditW, 30]);
+
+        actionY = renameY - 38;
+        set(btnDeleteSelected, 'Position', [xPad, actionY, listW, 30]);
+
+        filterY = actionY - 44;
+        set(lblFilter, 'Position', [xPad, filterY + 4, 50, 22]);
+        set(chkLow, 'Position', [xPad + 55, filterY + 2, 85, 22]);
+        set(chkHigh, 'Position', [xPad + 145, filterY + 2, 90, 22]);
+
+        cutoffY = filterY - 40;
+        colGap = 10;
+        colW = floor((listW - colGap) / 2);
+        leftColX = xPad;
+        rightColX = xPad + colW + colGap;
+        cutoffLabelW = 52;
+        cutoffEditW = max(56, colW - cutoffLabelW - 4);
+        set(lblLowCutoff, 'Position', [leftColX, cutoffY + 4, cutoffLabelW, 22]);
+        set(edtLowCutoff, 'Position', [leftColX + cutoffLabelW + 4, cutoffY, cutoffEditW, 30]);
+        set(lblHighCutoff, 'Position', [rightColX, cutoffY + 4, cutoffLabelW, 22]);
+        set(edtHighCutoff, 'Position', [rightColX + cutoffLabelW + 4, cutoffY, cutoffEditW, 30]);
+
+        orderY = cutoffY - 40;
+        set(lblOrder, 'Position', [xPad, orderY + 4, 45, 22]);
+        set(edtOrder, 'Position', [xPad + 45, orderY, 60, 30]);
+
+        btnY = orderY - 50;
+        btnGap = 10;
+        btnW = floor((listW - btnGap) / 2);
+        btnX1 = xPad;
+        btnX2 = xPad + btnW + btnGap;
+        btnY2 = btnY - 38;
+        set(btnPlot, 'Position', [btnX1, btnY, btnW, 32]);
+        set(btnHold, 'Position', [btnX2, btnY, btnW, 32]);
+        set(btnReset, 'Position', [btnX1, btnY2, btnW, 32]);
+        set(btnClear, 'Position', [btnX2, btnY2, btnW, 32]);
+
+        set(lblStatus, 'Position', [xPad, btnY2 - 52, pw - 2 * xPad, 40]);
+
+        % Right plot area
+        rightXFig = margin + leftW + gapLR;
+        rightMargin = 10;
+        rightTopPad = 8;
+        rightBottomPad = 10;
+        axesLeftPad = 8;
+        axesRightPad = 4;
+        rightW = max(420, fw - rightXFig - rightMargin);
+        rightH = max(430, fh - rightTopPad - rightBottomPad);
+        rowGap = 6;
+        selH = 24;
+        rowH = floor((rightH - 2 * rowGap) / 3);
+        axH = max(110, rowH - selH - 8);
+        selW = 110;
+        figBtnW = 62;
+        selLabelW = 45;
+        selLabelX = rightXFig;
+        selX = selLabelX + selLabelW + 6;
+        figBtnX = selX + selW + 6;
+        axX = rightXFig + axesLeftPad;
+        axW = max(380, rightW - axesLeftPad - axesRightPad);
+
+        top1 = rightBottomPad + 2 * (rowH + rowGap);
+        top2 = rightBottomPad + rowH + rowGap;
+        top3 = rightBottomPad;
+
+        set(lblSel1, 'Position', [selLabelX, top1 + axH + 4, selLabelW, 22]);
+        set(ddSel1, 'Position', [selX, top1 + axH + 2, selW, selH]);
+        set(btnFig1, 'Position', [figBtnX, top1 + axH + 1, figBtnW, 26]);
+        set(axMain1, 'OuterPosition', [axX, top1, axW, axH]);
+
+        set(lblSel2, 'Position', [selLabelX, top2 + axH + 4, selLabelW, 22]);
+        set(ddSel2, 'Position', [selX, top2 + axH + 2, selW, selH]);
+        set(btnFig2, 'Position', [figBtnX, top2 + axH + 1, figBtnW, 26]);
+        set(axMain2, 'OuterPosition', [axX, top2, axW, axH]);
+
+        set(lblSel3, 'Position', [selLabelX, top3 + axH + 4, selLabelW, 22]);
+        set(ddSel3, 'Position', [selX, top3 + axH + 2, selW, selH]);
+        set(btnFig3, 'Position', [figBtnX, top3 + axH + 1, figBtnW, 26]);
+        set(axMain3, 'OuterPosition', [axX, top3, axW, axH]);
+    end
+
+    function onLoadFile(~, ~)
+        app = getappdata(fig, 'app');
+        startDir = app.lastOpenDir;
+        if isempty(startDir) || ~isDirCompat(startDir)
+            startDir = pwd;
+        end
+
+        [fname, fpath] = uigetfile( ...
+            {'*.vna;*.mat;*.txt;*.dat;*.csv;*.xlsx', 'Data Files (*.vna,*.mat,*.txt,*.dat,*.csv,*.xlsx)'; ...
+             '*.*', 'All Files (*.*)'}, ...
+            'Select vibration data file(s)', ...
+            startDir, ...
+            'MultiSelect', 'on');
+        if isequal(fname, 0)
+            return;
+        end
+
+        if isTextScalarCompat(fname)
+            fileList = {char(fname)};
+        else
+            fileList = fname;
+        end
+
+        set(lblStatus, 'String', sprintf('Status: loading %d file(s)...', numel(fileList)));
+        drawnow;
+
+        app.lastOpenDir = fpath;
+        loadedNow = 0;
+        failedNow = 0;
+        lastErr = '';
+
+        for i = 1:numel(fileList)
+            oneFile = fileList{i};
+            fullName = fullfile(fpath, oneFile);
+            try
+                D = readVibrationFile(fullName, getNumericControlValue(edtFs, 1000));
+                D.filePath = fullName;
+                D.fileName = oneFile;
+                D.id = app.nextFileId;
+                app.nextFileId = app.nextFileId + 1;
+                app.files{end + 1} = D;
+                app.loaded = true;
+                loadedNow = loadedNow + 1;
+            catch ME
+                failedNow = failedNow + 1;
+                lastErr = ME.message;
+            end
+        end
+
+        if ~isempty(app.files)
+            app.validChannels = collectValidChannels(app.files);
+            app.fs = app.files{end}.fs;
+            setNumericControlValue(edtFs, app.fs);
+            app = rebuildSeriesList(app);
+        end
+
+        setappdata(fig, 'app', app);
+        refreshLoadedFilesList();
+
+        cla(axMain1);
+        cla(axMain2);
+        cla(axMain3);
+
+        if isempty(app.files)
+            showAlertCompat(fig, 'No files were loaded successfully.', 'Load failed');
+            if ~isempty(lastErr)
+                set(lblStatus, 'String', ['Status: load failed | ' lastErr]);
+            else
+                set(lblStatus, 'String', 'Status: load failed');
+            end
+            return;
+        end
+
+        set(edtFile, 'String', summarizeLoadedFiles(app.files));
+        if failedNow > 0
+            set(lblStatus, 'String', sprintf('Status: loaded %d file(s), failed %d | last error: %s', loadedNow, failedNow, lastErr));
+        else
+            set(lblStatus, 'String', sprintf('Status: loaded %d file(s) | generated %d data entries', loadedNow, numel(app.series)));
+        end
+    end
+
+    function onPlot(~, ~)
+        app = getappdata(fig, 'app');
+        if ~app.loaded || isempty(app.files)
+            showAlertCompat(fig, 'Please load data first.', 'Tip');
+            return;
+        end
+
+        selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
+        if isempty(selectedSeries)
+            showAlertCompat(fig, 'Please select at least one data entry (File+Channel).', 'Tip');
+            return;
+        end
+
+        refInput = 1;
+        keepExisting = logical(get(btnHold, 'Value'));
+        if ~keepExisting
+            cla(axMain1); cla(axMain2); cla(axMain3);
+        end
+
+        renderOneAxis(axMain1, getPopupSelection(ddSel1), selectedSeries, app, refInput, keepExisting);
+        renderOneAxis(axMain2, getPopupSelection(ddSel2), selectedSeries, app, refInput, keepExisting);
+        renderOneAxis(axMain3, getPopupSelection(ddSel3), selectedSeries, app, refInput, keepExisting);
+        if keepExisting
+            set(lblStatus, 'String', sprintf('Status: HOLD ON, appended %d entries', numel(selectedSeries)));
+        else
+            set(lblStatus, 'String', sprintf('Status: plotted %d selected entries', numel(selectedSeries)));
+        end
+    end
+
+    function onOpenAxisFigure(sourceAx, fallbackTitle)
+        if countLineLikeChildren(sourceAx) == 0
+            showAlertCompat(fig, 'Current plot is empty. Please plot data first.', 'Tip');
+            return;
+        end
+
+        figName = getAxisExportTitle(sourceAx, fallbackTitle);
+        cloneAxisToFigure(sourceAx, figName);
+        set(lblStatus, 'String', sprintf('Status: opened "%s" in a separate figure', figName));
+    end
+
+    function onRenameEdited(~, ~)
+        renameSelectedFromField(false);
+    end
+
+    function renameSelectedFromField(showSelectionTips)
+        app = getappdata(fig, 'app');
+        selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
+        if isempty(selectedSeries)
+            if showSelectionTips
+                showAlertCompat(fig, 'Please select one data item to rename.', 'Tip');
+            end
+            return;
+        end
+        if numel(selectedSeries) ~= 1
+            if showSelectionTips
+                showAlertCompat(fig, 'Please select only one data item when renaming.', 'Tip');
+            end
+            return;
+        end
+
+        S = selectedSeries{1};
+        newLabel = strtrim(get(edtRename, 'String'));
+        if isempty(newLabel)
+            if showSelectionTips
+                showAlertCompat(fig, 'Please type the new name in the Rename box first.', 'Tip');
+            end
+            return;
+        end
+        if strcmp(newLabel, S.label)
+            return;
+        end
+
+        seriesFileId = getSeriesFileId(S, app);
+        if ~isfinite(seriesFileId)
+            showAlertCompat(fig, 'Cannot resolve the selected data item. Please reload the file and try again.', 'Rename failed');
+            return;
+        end
+        app = setCustomSeriesLabel(app, seriesFileId, S.ch, newLabel);
+        app = rebuildSeriesList(app);
+        setappdata(fig, 'app', app);
+        renamedLabel = findSeriesLabel(app.series, seriesFileId, S.ch, S.label);
+        refreshLoadedFilesList({renamedLabel});
+        set(edtRename, 'String', renamedLabel);
+        set(lblStatus, 'String', sprintf('Status: renamed "%s" to "%s"', S.label, renamedLabel));
+    end
+
+    function onScaleEdited(~, ~)
+        app = getappdata(fig, 'app');
+        selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
+        if ~isscalar(selectedSeries)
+            return;
+        end
+
+        scaleValue = str2double(get(edtScale, 'String'));
+        if ~isfinite(scaleValue)
+            set(edtScale, 'String', num2str(getSeriesScale(app, selectedSeries{1})));
+            showAlertCompat(fig, 'Factor must be a valid number.', 'Tip');
+            return;
+        end
+
+        S = selectedSeries{1};
+        seriesFileId = getSeriesFileId(S, app);
+        if ~isfinite(seriesFileId)
+            return;
+        end
+        app = setCustomSeriesScale(app, seriesFileId, S.ch, scaleValue);
+        setappdata(fig, 'app', app);
+        set(lblStatus, 'String', sprintf('Status: updated factor of "%s" to %g', S.label, scaleValue));
+    end
+
+    function onDataSelectionChanged(~, ~)
+        app = getappdata(fig, 'app');
+        selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
+        if isscalar(selectedSeries)
+            set(edtRename, 'String', selectedSeries{1}.label);
+            set(edtScale, 'String', num2str(getSeriesScale(app, selectedSeries{1})));
+        else
+            set(edtRename, 'String', '');
+            set(edtScale, 'String', '1');
+        end
+    end
+
+    function usedRef = renderOneAxis(ax, mode, selectedSeries, app, refInput, keepExisting)
+        usedRef = NaN;
+        styleAxisCompat(ax);
+        switch mode
+            case 'Time'
+                set(ax, 'XScale', 'linear', 'YScale', 'linear');
+                set(ax, 'XLimMode', 'auto', 'YLimMode', 'auto');
+                hold(ax, 'on');
+                anyTime = false;
+                colorIdx = countLineLikeChildren(ax) + 1;
+                xMin = inf;
+                xMax = -inf;
+                yMin = inf;
+                yMax = -inf;
+                for si = 1:numel(selectedSeries)
+                    S = selectedSeries{si};
+                    F = app.files{S.fileIdx};
+                    yRaw = safeCellGet(F.rawByCh, S.ch);
+                    if isempty(yRaw)
+                        continue;
+                    end
+                    yDraw = applyFilterToSignal( ...
+                        yRaw, F.fs, logical(get(chkLow, 'Value')), getNumericControlValue(edtLowCutoff, 100), ...
+                        logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), getNumericControlValue(edtOrder, 4));
+                    yDraw = yDraw * getSeriesScale(app, S);
+                    N = min(numel(F.t), numel(yDraw));
+                    safePlot(ax, F.t(1:N), yDraw(1:N), 'LineWidth', 1.1, ...
+                        'Color', getSeriesColor(colorIdx), 'DisplayName', S.label);
+                    anyTime = true;
+                    colorIdx = colorIdx + 1;
+                    xMin = min(xMin, F.t(1));
+                    xMax = max(xMax, F.t(N));
+                    yMin = min(yMin, min(yDraw(1:N)));
+                    yMax = max(yMax, max(yDraw(1:N)));
+                end
+                hold(ax, 'off');
+                grid(ax, 'on');
+                xlabel(ax, 'Time (s)');
+                ylabel(ax, 'Acceleration (m/s^2)');
+                if anyTime
+                    title(ax, sprintf('Time Domain (%d entries)', numel(selectedSeries)));
+                    legend(ax, 'show', 'Location', 'northeast');
+                    if ~keepExisting && isfinite(xMin) && isfinite(xMax) && xMax > xMin
+                        xlim(ax, [xMin, xMax]);
+                    end
+                    if ~keepExisting && isfinite(yMin) && isfinite(yMax)
+                        if yMax <= yMin
+                            ylim(ax, [yMin - 1, yMin + 1]);
+                        else
+                            ylim(ax, [yMin, yMax]);
+                        end
+                    end
+                else
+                    title(ax, 'Time Domain (no valid data)');
+                    legend(ax, 'off');
+                end
+
+            case 'PSD'
+                set(ax, 'XScale', 'log', 'YScale', 'log', 'YLimMode', 'auto');
+                hold(ax, 'on');
+                anyPsd = false;
+                colorIdx = countLineLikeChildren(ax) + 1;
+                xMin = inf; xMax = -inf; yMin = inf; yMax = -inf;
+                for si = 1:numel(selectedSeries)
+                    S = selectedSeries{si};
+                    F = app.files{S.fileIdx};
+                    [f, psd] = getPsdForChannel(F, S.ch);
+                    if isempty(f)
+                        continue;
+                    end
+                    safeLoglog(ax, f, psd, 'LineWidth', 1.1, ...
+                        'Color', getSeriesColor(colorIdx), 'DisplayName', S.label);
+                    anyPsd = true;
+                    colorIdx = colorIdx + 1;
+                    xMin = min(xMin, f(1)); xMax = max(xMax, f(end));
+                    yMin = min(yMin, min(psd)); yMax = max(yMax, max(psd));
+                end
+                hold(ax, 'off');
+                grid(ax, 'on');
+                xlabel(ax, 'Frequency (Hz)');
+                ylabel(ax, '(m/s^2)^2/Hz');
+                if anyPsd
+                    title(ax, sprintf('PSD (log-log, %d entries)', numel(selectedSeries)));
+                    legend(ax, 'show', 'Location', 'northeast');
+                    if ~keepExisting && isfinite(xMin) && isfinite(xMax) && xMax > xMin
+                        xlim(ax, [xMin, xMax]);
+                    end
+                    if ~keepExisting && isfinite(yMin) && isfinite(yMax) && yMin > 0
+                        if yMax <= yMin
+                            ylim(ax, [yMin * 0.9, yMin * 1.1]);
+                        else
+                            ylim(ax, [yMin, yMax]);
+                        end
+                    end
+                else
+                    title(ax, 'PSD (no valid data)');
+                    legend(ax, 'off');
+                end
+
+            otherwise % 'Trans'
+                set(ax, 'XScale', 'log', 'YScale', 'linear', 'YLimMode', 'auto');
+                hold(ax, 'on');
+                anyTr = false;
+                colorIdx = countLineLikeChildren(ax) + 1;
+                xMin = inf; xMax = -inf; yMin = inf; yMax = -inf;
+                usedRef = refInput;
+                for si = 1:numel(selectedSeries)
+                    S = selectedSeries{si};
+                    F = app.files{S.fileIdx};
+                    if ~F.vna.available
+                        continue;
+                    end
+                    refCh = chooseNearestValid(refInput, F.validChannels);
+                    usedRef = refCh;
+                    if S.ch == refCh || ~ismember(S.ch, F.validChannels)
+                        continue;
+                    end
+                    [f, trDb] = getTransRatio(F, S.ch, refCh);
+                    if isempty(f)
+                        continue;
+                    end
+                    safeSemilogx(ax, f, trDb, 'LineWidth', 1.1, ...
+                        'Color', getSeriesColor(colorIdx), ...
+                        'DisplayName', S.label);
+                    anyTr = true;
+                    colorIdx = colorIdx + 1;
+                    xMin = min(xMin, f(1)); xMax = max(xMax, f(end));
+                    yMin = min(yMin, min(trDb)); yMax = max(yMax, max(trDb));
+                end
+                hold(ax, 'off');
+                grid(ax, 'on');
+                xlabel(ax, 'Frequency (Hz)');
+                ylabel(ax, 'dB');
+                if anyTr
+                    title(ax, sprintf('Transmissibility (dB, ref~ch%d)', usedRef));
+                    legend(ax, 'show', 'Location', 'northeast');
+                    if ~keepExisting && isfinite(xMin) && isfinite(xMax) && xMax > xMin
+                        xlim(ax, [xMin, xMax]);
+                    end
+                    if ~keepExisting && isfinite(yMin) && isfinite(yMax)
+                        if yMax <= yMin
+                            ylim(ax, [yMin - 1, yMin + 1]);
+                        else
+                            ylim(ax, [yMin, yMax]);
+                        end
+                    end
+                else
+                    title(ax, sprintf('Transmissibility (no valid data, ref~ch%d)', refInput));
+                    legend(ax, 'off');
+                end
+        end
+    end
+
+    function onHoldChanged(~, ~)
+        if get(btnHold, 'Value')
+            set(lblStatus, 'String', 'Status: Hold ON (next Plot will append)');
+        else
+            set(lblStatus, 'String', 'Status: Hold OFF (next Plot will replace)');
+        end
+    end
+
+    function onResetFilter(~, ~)
+        set(chkLow, 'Value', 0);
+        set(chkHigh, 'Value', 0);
+        set(lblStatus, 'String', 'Status: filter reset to None');
+    end
+
+    function onClearPlots(~, ~)
+        cla(axMain1); cla(axMain2); cla(axMain3);
+        legend(axMain1, 'off'); legend(axMain2, 'off'); legend(axMain3, 'off');
+        renderOneAxis(axMain1, getPopupSelection(ddSel1), {}, getappdata(fig, 'app'), 1, false);
+        renderOneAxis(axMain2, getPopupSelection(ddSel2), {}, getappdata(fig, 'app'), 1, false);
+        renderOneAxis(axMain3, getPopupSelection(ddSel3), {}, getappdata(fig, 'app'), 1, false);
+        set(lblStatus, 'String', 'Status: plots cleared');
+    end
+
+    function onDeleteSelectedFiles(~, ~)
+        app = getappdata(fig, 'app');
+        if isempty(app.series)
+            return;
+        end
+
+        selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
+        if isempty(selectedSeries)
+            showAlertCompat(fig, 'Please select data item(s) to delete in list.', 'Tip');
+            return;
+        end
+
+        removed = numel(selectedSeries);
+
+        % Remove selected channels from source files so deletion persists.
+        removeByFile = cell(1, numel(app.files));
+        for i = 1:numel(selectedSeries)
+            S = selectedSeries{i};
+            removeByFile{S.fileIdx}(end + 1) = S.ch;
+        end
+
+        for fi = 1:numel(app.files)
+            if isempty(removeByFile{fi})
+                continue;
+            end
+            F = app.files{fi};
+            rmCh = unique(removeByFile{fi}, 'stable');
+            F.validChannels = setdiff(F.validChannels, rmCh, 'stable');
+            app.files{fi} = F;
+        end
+
+        keepFile = true(1, numel(app.files));
+        for fi = 1:numel(app.files)
+            if isempty(app.files{fi}.validChannels)
+                keepFile(fi) = false;
+            end
+        end
+        app.files = app.files(keepFile);
+
+        if isempty(app.files)
+            app.loaded = false;
+            app.validChannels = 1;
+            app.series = {};
+            set(edtFile, 'String', 'No file loaded');
+        else
+            app.loaded = true;
+            app.validChannels = collectValidChannels(app.files);
+            app.fs = app.files{end}.fs;
+            setNumericControlValue(edtFs, app.fs);
+            app = rebuildSeriesList(app);
+            set(edtFile, 'String', summarizeLoadedFiles(app.files));
+        end
+
+        setappdata(fig, 'app', app);
+        refreshLoadedFilesList();
+        set(lblStatus, 'String', sprintf('Status: deleted %d entries, remaining %d', removed, numel(app.series)));
+    end
+
+    function refreshLoadedFilesList(selectedLabels)
+        if nargin < 1
+            selectedLabels = {};
+        end
+        app = getappdata(fig, 'app');
+        if isempty(app.series)
+            set(lstData, 'String', {' '}, 'Value', 1);
+            set(edtRename, 'String', '');
+            return;
+        end
+
+        n = numel(app.series);
+        items = cell(1, n);
+        for i = 1:n
+            items{i} = app.series{i}.label;
+        end
+        set(lstData, 'String', items);
+        setListSelectionByLabels(lstData, items, selectedLabels);
+        onDataSelectionChanged();
+    end
+end
+
+function app = initAppState()
+app.loaded = false;
+app.filePath = '';
+app.t = [];
+app.fs = [];
+app.validChannels = 1;
+app.rawByCh = {[]};
+app.fileName = '';
+app.files = {};
+app.nextFileId = 1;
+app.series = {};
+app.customSeriesNames = {};
+app.customSeriesScales = {};
+app.vna = struct( ...
+    'available', false, ...
+    'nCh', 1, ...
+    'freq', [], ...
+    'aspec', {{}}, ...
+    'eu', 1, ...
+    'wincor', 1, ...
+    'rbw', 1);
+end
+
+function D = readVibrationFile(fileName, fsHint)
+[~, ~, ext] = fileparts(fileName);
+ext = lower(ext);
+D = initAppState();
+
+switch ext
+    case {'.vna', '.mat'}
+        S = load(fileName, '-mat');
+        D = parseVnaLikeStruct(S, fsHint, D);
+    case {'.txt', '.dat', '.csv', '.xlsx'}
+        X = readMatrixCompat(fileName);
+        [t, y, fs] = parseNumericMatrix(X, fsHint);
+        D.loaded = true;
+        D.t = t;
+        D.fs = fs;
+        D.validChannels = 1;
+        D.rawByCh = {y(:)};
+        D.vna.available = false;
+    otherwise
+        error('Unsupported file type: %s', ext);
+end
+end
+
+function D = parseVnaLikeStruct(S, fsHint, D)
+slm = [];
+if isfield(S, 'SLm')
+    slm = S.SLm;
+else
+    fns = fieldnames(S);
+    for i = 1:numel(fns)
+        v = S.(fns{i});
+        if isstruct(v) && isfield(v, 'scmeas') && isfield(v, 'tdxvec')
+            slm = v;
+            break;
+        end
+    end
+end
+if isempty(slm)
+    error('No SLm-like struct found in file.');
+end
+if ~isfield(slm, 'tdxvec') || ~isfield(slm, 'scmeas')
+    error('SLm struct missing required fields: tdxvec/scmeas.');
+end
+
+t = slm.tdxvec(:);
+if numel(t) < 2
+    error('tdxvec is too short.');
+end
+dt = mean(diff(t));
+if ~isfinite(dt) || dt <= 0
+    validateFs(fsHint);
+    fs = fsHint;
+    t = (0:numel(t)-1)' / fs;
+else
+    fs = 1 / dt;
+end
+
+nCh = numel(slm.scmeas);
+rawByCh = cell(1, nCh);
+validCh = [];
+for ch = 1:nCh
+    sc = slm.scmeas(ch);
+    hasTd = isfield(sc, 'tdmeas') && ~isempty(sc.tdmeas);
+    hasAspec = isfield(sc, 'aspec') && ~isempty(sc.aspec);
+    if hasTd || hasAspec
+        validCh(end + 1) = ch; %#ok<AGROW>
+    end
+    if hasTd
+        eu = getEuVal(sc);
+        y = sc.tdmeas(:) * eu;
+        N = min(numel(t), numel(y));
+        rawByCh{ch} = y(1:N);
+    else
+        rawByCh{ch} = [];
+    end
+end
+
+if isempty(validCh)
+    error('No valid channels found in scmeas.');
+end
+
+vna = struct( ...
+    'available', false, ...
+    'nCh', nCh, ...
+    'freq', [], ...
+    'aspec', {cell(1, nCh)}, ...
+    'eu', ones(1, nCh), ...
+    'wincor', 1, ...
+    'rbw', 1);
+
+if isfield(slm, 'fdxvec') && ~isempty(slm.fdxvec)
+    vna.freq = slm.fdxvec(:);
+end
+if isfield(slm, 'wincor') && isfinite(slm.wincor)
+    vna.wincor = slm.wincor;
+end
+if isfield(slm, 'rbw') && isfinite(slm.rbw) && slm.rbw > 0
+    vna.rbw = slm.rbw;
+end
+
+for ch = 1:nCh
+    sc = slm.scmeas(ch);
+    if isfield(sc, 'aspec') && ~isempty(sc.aspec)
+        a = sc.aspec(:);
+        if ~isempty(vna.freq)
+            M = min(numel(vna.freq), numel(a));
+            a = a(1:M);
+        end
+        vna.aspec{ch} = a;
+    else
+        vna.aspec{ch} = [];
+    end
+    vna.eu(ch) = getEuVal(sc);
+end
+if ~isempty(vna.freq)
+    vna.available = true;
+end
+
+D.loaded = true;
+D.t = t;
+D.fs = fs;
+D.validChannels = validCh;
+D.rawByCh = rawByCh;
+D.vna = vna;
+end
+
+function yDraw = applyFilterToSignal(yRaw, fs, useLow, lowCutoff, useHigh, highCutoff, order)
+yDraw = yRaw(:);
+if isempty(yDraw) || ~isfinite(fs) || fs <= 0
+    return;
+end
+
+order = max(1, round(order));
+nyquist = fs / 2;
+
+if useLow && useHigh && isfinite(lowCutoff) && isfinite(highCutoff) && highCutoff >= lowCutoff
+    return;
+end
+
+try
+    if useHigh && isfinite(highCutoff) && highCutoff > 0 && highCutoff < nyquist
+        wnHigh = highCutoff / nyquist;
+        [bHigh, aHigh] = butter(order, wnHigh, 'high');
+        yDraw = filtfilt(bHigh, aHigh, yDraw);
+    end
+
+    if useLow && isfinite(lowCutoff) && lowCutoff > 0 && lowCutoff < nyquist
+        wnLow = lowCutoff / nyquist;
+        [bLow, aLow] = butter(order, wnLow, 'low');
+        yDraw = filtfilt(bLow, aLow, yDraw);
+    end
+catch
+    % If filtering fails (short signal, unstable coefficients), keep raw signal.
+    yDraw = yRaw(:);
+end
+end
+
+function [f, psd] = getPsdForChannel(F, ch)
+f = [];
+psd = [];
+if F.vna.available && ch >= 1 && ch <= F.vna.nCh
+    a = safeCellGet(F.vna.aspec, ch);
+    if ~isempty(a) && ~isempty(F.vna.freq) && isfinite(F.vna.rbw) && F.vna.rbw > 0
+        M = min(numel(F.vna.freq), numel(a));
+        f0 = F.vna.freq(1:M);
+        eu = safeGet(F.vna.eu, ch, 1);
+        p0 = F.vna.wincor * a(1:M) * (eu^2) / F.vna.rbw;
+        valid = isfinite(f0) & isfinite(p0) & (f0 > 0) & (p0 > 0);
+        f = f0(valid);
+        psd = p0(valid);
+        return;
+    end
+end
+
+y = safeCellGet(F.rawByCh, ch);
+if isempty(y)
+    return;
+end
+[f, psd] = singleSideSpectrum(y, F.fs);
+valid = isfinite(f) & isfinite(psd) & (f >= 0) & (psd >= 0);
+f = f(valid);
+psd = psd(valid);
+end
+
+function [f, trDb] = getTransRatio(F, ch, refCh)
+f = [];
+trDb = [];
+if ~F.vna.available
+    return;
+end
+if ch < 1 || ch > F.vna.nCh || refCh < 1 || refCh > F.vna.nCh
+    return;
+end
+ak = safeCellGet(F.vna.aspec, ch);
+ar = safeCellGet(F.vna.aspec, refCh);
+if isempty(ak) || isempty(ar) || isempty(F.vna.freq)
+    return;
+end
+M = min([numel(F.vna.freq), numel(ak), numel(ar)]);
+f0 = F.vna.freq(1:M);
+rbw = F.vna.rbw;
+if ~isfinite(rbw) || rbw <= 0
+    return;
+end
+euK = safeGet(F.vna.eu, ch, 1);
+euR = safeGet(F.vna.eu, refCh, 1);
+
+% Per-channel magnitude scaling required by user:
+% scaled(ch) = aspec(ch) * eu_val(ch)^2 / rbw
+num = ak(1:M) * (euK ^ 2) / rbw;
+den = ar(1:M) * (euR ^ 2) / rbw;
+
+valid = isfinite(f0) & isfinite(num) & isfinite(den) & (f0 > 0) & (num > 0) & (den > 0);
+f = f0(valid);
+trLin = num(valid) ./ den(valid);
+trDb = 10 * log10(trLin);
+end
+
+function [t, y, fs] = parseNumericMatrix(X, fsHint)
+if isempty(X) || ~isnumeric(X)
+    error('File does not contain numeric data.');
+end
+
+X = squeeze(X);
+if isvector(X)
+    y = X(:);
+    validateFs(fsHint);
+    fs = fsHint;
+    t = (0:numel(y)-1)' / fs;
+    return;
+end
+
+if size(X, 2) >= 2
+    c1 = X(:, 1);
+    c2 = X(:, 2);
+    if isTimeLike(c1)
+        t = c1(:);
+        y = c2(:);
+        fs = 1 / mean(diff(t));
+    else
+        y = c1(:);
+        validateFs(fsHint);
+        fs = fsHint;
+        t = (0:numel(y)-1)' / fs;
+    end
+else
+    y = X(:, 1);
+    validateFs(fsHint);
+    fs = fsHint;
+    t = (0:numel(y)-1)' / fs;
+end
+end
+
+function eu = getEuVal(sc)
+if isfield(sc, 'eu_val') && ~isempty(sc.eu_val) && isfinite(sc.eu_val)
+    eu = sc.eu_val;
+else
+    eu = 1;
+end
+end
+
+function valid = collectValidChannels(files)
+valid = [];
+for i = 1:numel(files)
+    v = files{i}.validChannels;
+    if ~isempty(v)
+        valid = [valid, v(:)']; %#ok<AGROW>
+    end
+end
+if isempty(valid)
+    valid = 1;
+else
+    valid = unique(valid, 'stable');
+end
+end
+
+function txt = summarizeLoadedFiles(files)
+n = numel(files);
+if n <= 3
+    names = cell(1, n);
+    for i = 1:n
+        names{i} = files{i}.fileName;
+    end
+    txt = strjoin(names, '; ');
+else
+    txt = sprintf('%d files loaded (last: %s)', n, files{end}.fileName);
+end
+end
+
+function app = rebuildSeriesList(app)
+app = pruneCustomSeriesLabels(app);
+app = pruneCustomSeriesScales(app);
+totalSeries = 0;
+for fi = 1:numel(app.files)
+    totalSeries = totalSeries + numel(app.files{fi}.validChannels);
+end
+series = cell(1, totalSeries);
+si = 0;
+for fi = 1:numel(app.files)
+    F = app.files{fi};
+    for ci = 1:numel(F.validChannels)
+        ch = F.validChannels(ci);
+        label = getSeriesBaseLabel(app, F, ch);
+        % Keep labels unique even when same file is loaded multiple times.
+        base = label;
+        k = 2;
+        while any(cellfun(@(s) ~isempty(s) && strcmp(s.label, label), series(1:si)))
+            label = sprintf('%s#%d', base, k);
+            k = k + 1;
+        end
+        si = si + 1;
+        series{si} = struct('fileIdx', fi, 'fileId', F.id, 'ch', ch, 'label', label);
+    end
+end
+series = series(1:si);
+app.series = series;
+end
+
+function app = pruneCustomSeriesLabels(app)
+if isempty(app.customSeriesNames)
+    return;
+end
+validFileIds = zeros(1, numel(app.files));
+for i = 1:numel(app.files)
+    validFileIds(i) = app.files{i}.id;
+end
+
+keep = false(1, numel(app.customSeriesNames));
+for i = 1:numel(app.customSeriesNames)
+    keep(i) = ismember(app.customSeriesNames{i}.fileId, validFileIds);
+end
+app.customSeriesNames = app.customSeriesNames(keep);
+end
+
+function app = pruneCustomSeriesScales(app)
+if isempty(app.customSeriesScales)
+    return;
+end
+validFileIds = zeros(1, numel(app.files));
+for i = 1:numel(app.files)
+    validFileIds(i) = app.files{i}.id;
+end
+
+keep = false(1, numel(app.customSeriesScales));
+for i = 1:numel(app.customSeriesScales)
+    keep(i) = ismember(app.customSeriesScales{i}.fileId, validFileIds);
+end
+app.customSeriesScales = app.customSeriesScales(keep);
+end
+
+function label = getSeriesBaseLabel(app, F, ch)
+label = getCustomSeriesLabel(app, F.id, ch);
+if isempty(label)
+    label = sprintf('%s+ch%d', F.fileName, ch);
+end
+end
+
+function label = getCustomSeriesLabel(app, fileId, ch)
+label = '';
+for i = 1:numel(app.customSeriesNames)
+    one = app.customSeriesNames{i};
+    if one.fileId == fileId && one.ch == ch
+        label = one.label;
+        return;
+    end
+end
+end
+
+function app = setCustomSeriesLabel(app, fileId, ch, label)
+found = false;
+for i = 1:numel(app.customSeriesNames)
+    one = app.customSeriesNames{i};
+    if one.fileId == fileId && one.ch == ch
+        app.customSeriesNames{i}.label = label;
+        found = true;
+        break;
+    end
+end
+if ~found
+    app.customSeriesNames{end + 1} = struct('fileId', fileId, 'ch', ch, 'label', label);
+end
+end
+
+function scaleValue = getSeriesScale(app, S)
+fileId = getSeriesFileId(S, app);
+scaleValue = 1;
+if ~isfinite(fileId)
+    return;
+end
+for i = 1:numel(app.customSeriesScales)
+    one = app.customSeriesScales{i};
+    if one.fileId == fileId && one.ch == S.ch
+        scaleValue = one.scale;
+        return;
+    end
+end
+end
+
+function app = setCustomSeriesScale(app, fileId, ch, scaleValue)
+found = false;
+for i = 1:numel(app.customSeriesScales)
+    one = app.customSeriesScales{i};
+    if one.fileId == fileId && one.ch == ch
+        app.customSeriesScales{i}.scale = scaleValue;
+        found = true;
+        break;
+    end
+end
+if ~found
+    app.customSeriesScales{end + 1} = struct('fileId', fileId, 'ch', ch, 'scale', scaleValue);
+end
+end
+
+function label = findSeriesLabel(series, fileId, ch, fallback)
+label = fallback;
+for i = 1:numel(series)
+    if series{i}.fileId == fileId && series{i}.ch == ch
+        label = series{i}.label;
+        return;
+    end
+end
+end
+
+function fileId = getSeriesFileId(S, app)
+if isfield(S, 'fileId') && ~isempty(S.fileId)
+    fileId = S.fileId;
+    return;
+end
+
+fileId = NaN;
+if isfield(S, 'fileIdx') && ~isempty(S.fileIdx)
+    fileIdx = S.fileIdx;
+    if fileIdx >= 1 && fileIdx <= numel(app.files) && isfield(app.files{fileIdx}, 'id')
+        fileId = app.files{fileIdx}.id;
+        return;
+    end
+end
+end
+
+function selectedSeries = getSelectedSeries(series, selectedLabels)
+if isempty(series) || isempty(selectedLabels)
+    selectedSeries = {};
+    return;
+end
+if isTextScalarCompat(selectedLabels)
+    selectedLabels = cellstr(selectedLabels);
+end
+selectedSeries = {};
+for i = 1:numel(series)
+    if ismember(series{i}.label, selectedLabels)
+        selectedSeries{end + 1} = series{i}; %#ok<AGROW>
+    end
+end
+end
+
+function ch = chooseNearestValid(chIn, validList)
+if isempty(validList)
+    ch = 1;
+    return;
+end
+if ismember(chIn, validList)
+    ch = chIn;
+    return;
+end
+[~, i] = min(abs(validList - chIn));
+ch = validList(i);
+end
+
+function x = safeCellGet(c, idx)
+if idx >= 1 && idx <= numel(c)
+    x = c{idx};
+else
+    x = [];
+end
+end
+
+function v = safeGet(arr, idx, fallback)
+if idx >= 1 && idx <= numel(arr) && isfinite(arr(idx))
+    v = arr(idx);
+else
+    v = fallback;
+end
+end
+
+function safePlot(ax, x, y, varargin)
+valid = isfinite(x) & isfinite(y);
+x = x(valid);
+y = y(valid);
+if isempty(x) || isempty(y)
+    return;
+end
+plot(ax, x, y, varargin{:});
+end
+
+function safeSemilogx(ax, x, y, varargin)
+valid = isfinite(x) & isfinite(y) & (x > 0);
+x = x(valid);
+y = y(valid);
+if isempty(x) || isempty(y)
+    return;
+end
+semilogx(ax, x, y, varargin{:});
+end
+
+function safeLoglog(ax, x, y, varargin)
+valid = isfinite(x) & isfinite(y) & (x > 0) & (y > 0);
+x = x(valid);
+y = y(valid);
+if isempty(x) || isempty(y)
+    return;
+end
+loglog(ax, x, y, varargin{:});
+end
+
+function c = getSeriesColor(idx)
+palette = [ ...
+    0.0000 0.4470 0.7410; ...
+    0.8500 0.3250 0.0980; ...
+    0.9290 0.6940 0.1250; ...
+    0.4940 0.1840 0.5560; ...
+    0.4660 0.6740 0.1880; ...
+    0.3010 0.7450 0.9330; ...
+    0.6350 0.0780 0.1840; ...
+    0.2500 0.2500 0.2500];
+if nargin < 1 || ~isfinite(idx) || idx < 1
+    idx = 1;
+end
+idx = mod(round(idx) - 1, size(palette, 1)) + 1;
+c = palette(idx, :);
+end
+
+function n = countLineLikeChildren(ax)
+n = 0;
+try
+    kids = get(ax, 'Children');
+    for i = 1:numel(kids)
+        kidType = get(kids(i), 'Type');
+        if strcmp(kidType, 'line')
+            n = n + 1;
+        end
+    end
+catch
+    n = 0;
+end
+end
+
+function figName = getAxisExportTitle(ax, fallbackTitle)
+figName = fallbackTitle;
+try
+    t = get(get(ax, 'Title'), 'String');
+    if iscell(t)
+        t = strjoin(t, ' ');
+    end
+    if ischar(t) && ~isempty(strtrim(t))
+        figName = strtrim(t);
+    end
+catch
+end
+end
+
+function cloneAxisToFigure(sourceAx, figName)
+hFig = figure( ...
+    'Name', figName, ...
+    'NumberTitle', 'off', ...
+    'Color', 'w', ...
+    'MenuBar', 'figure', ...
+    'ToolBar', 'figure', ...
+    'Position', [120 120 900 560]);
+setFigureRendererCompat(hFig);
+
+newAx = axes('Parent', hFig, 'Units', 'normalized', 'Position', [0.13 0.11 0.775 0.815], 'Box', 'on');
+
+copyobj(allchild(sourceAx), newAx);
+set(newAx, ...
+    'XScale', get(sourceAx, 'XScale'), ...
+    'YScale', get(sourceAx, 'YScale'), ...
+    'XLim', get(sourceAx, 'XLim'), ...
+    'YLim', get(sourceAx, 'YLim'), ...
+    'XGrid', get(sourceAx, 'XGrid'), ...
+    'YGrid', get(sourceAx, 'YGrid'), ...
+    'Box', get(sourceAx, 'Box'), ...
+    'LineWidth', get(sourceAx, 'LineWidth'), ...
+    'FontSize', get(sourceAx, 'FontSize'));
+
+xlabel(newAx, get(get(sourceAx, 'XLabel'), 'String'));
+ylabel(newAx, get(get(sourceAx, 'YLabel'), 'String'));
+title(newAx, get(get(sourceAx, 'Title'), 'String'));
+
+try
+    legend(newAx, 'show', 'Location', 'northeast');
+catch
+end
+enableInteractiveFigureCompat(hFig);
+end
+
+function setListSelectionByLabels(h, items, selectedLabels)
+if isempty(items)
+    set(h, 'Value', 1);
+    return;
+end
+if isempty(selectedLabels)
+    set(h, 'Value', 1:numel(items));
+    return;
+end
+
+idx = zeros(1, numel(selectedLabels));
+k = 0;
+for i = 1:numel(selectedLabels)
+    oneIdx = find(strcmp(items, selectedLabels{i}), 1, 'first');
+    if ~isempty(oneIdx)
+        k = k + 1;
+        idx(k) = oneIdx;
+    end
+end
+idx = idx(1:k);
+if isempty(idx)
+    idx = 1;
+end
+set(h, 'Value', unique(idx, 'stable'));
+end
+
+function tf = isTimeLike(v)
+v = v(:);
+if numel(v) < 3 || any(~isfinite(v))
+    tf = false;
+    return;
+end
+d = diff(v);
+tf = all(d > 0) && (std(d) / max(mean(d), eps) < 1e-2);
+end
+
+function validateFs(fs)
+if isempty(fs) || ~isfinite(fs) || fs <= 0
+    error('Invalid Fs. Please input a valid sampling frequency.');
+end
+end
+
+function [f, amp] = singleSideSpectrum(y, fs)
+y = y(:);
+N = numel(y);
+y = y - mean(y);
+Y = fft(y);
+P2 = abs(Y / N);
+P1 = P2(1:floor(N / 2) + 1);
+if numel(P1) > 2
+    P1(2:end-1) = 2 * P1(2:end-1);
+end
+f = fs * (0:floor(N / 2))' / N;
+amp = P1(:);
+end
+
+function v = getNumericControlValue(h, fallback)
+v = fallback;
+try
+    raw = get(h, 'String');
+    if iscell(raw)
+        raw = raw{1};
+    end
+    numVal = str2double(raw);
+    if isfinite(numVal)
+        v = numVal;
+    end
+catch
+end
+end
+
+function setNumericControlValue(h, v)
+try
+    set(h, 'String', num2str(v));
+catch
+end
+end
+
+function mode = getPopupSelection(h)
+items = getCellStringCompat(get(h, 'String'));
+idx = get(h, 'Value');
+if isempty(items)
+    mode = 'Time';
+    return;
+end
+idx = max(1, min(numel(items), idx));
+mode = items{idx};
+end
+
+function labels = getSelectedListLabels(h)
+items = getCellStringCompat(get(h, 'String'));
+idx = get(h, 'Value');
+if isempty(items) || isempty(idx)
+    labels = {};
+    return;
+end
+idx = idx(idx >= 1 & idx <= numel(items));
+labels = items(idx);
+labels = labels(~cellfun(@isempty, labels));
+end
+
+function items = getCellStringCompat(raw)
+if isempty(raw)
+    items = {};
+elseif ischar(raw)
+    items = cellstr(raw);
+elseif iscell(raw)
+    items = raw;
+else
+    items = {};
+end
+end
+
+function tf = isDirCompat(p)
+tf = ischar(p) && exist(p, 'dir') == 7;
+end
+
+function showAlertCompat(figHandle, msg, ttl)
+try
+    uialert(figHandle, msg, ttl);
+catch
+    errordlg(msg, ttl);
+end
+end
+
+function tf = isTextScalarCompat(v)
+tf = ischar(v);
+if tf
+    return;
+end
+try
+    tf = isstring(v) && isscalar(v);
+catch
+    tf = false;
+end
+end
+
+function X = readMatrixCompat(fileName)
+if exist('readmatrix', 'file') == 2
+    X = readmatrix(fileName);
+    return;
+end
+
+[~, ~, ext] = fileparts(fileName);
+ext = lower(ext);
+switch ext
+    case '.xlsx'
+        X = xlsread(fileName);
+    otherwise
+        X = dlmread(fileName);
+end
+end
+
+function setFigureRendererCompat(hFig)
+try
+    set(hFig, 'Renderer', 'painters');
+catch
+end
+end
+
+function enableInteractiveFigureCompat(hFig)
+try
+    zoom(hFig, 'on');
+catch
+end
+try
+    pan(hFig, 'on');
+catch
+end
+try
+    dcm = datacursormode(hFig);
+    set(dcm, 'Enable', 'on', 'DisplayStyle', 'datatip', 'SnapToDataVertex', 'on');
+catch
+end
+end
+
+function styleAxisCompat(ax)
+try
+    set(ax, 'Box', 'on', 'LineWidth', 1.0, 'FontSize', 10, ...
+        'ActivePositionProperty', 'outerposition', ...
+        'LooseInset', [0.08 0.08 0.03 0.05]);
+catch
+end
+end

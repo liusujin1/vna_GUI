@@ -32,6 +32,10 @@ btnLoad = uicontrol('Parent', panel, 'Style', 'pushbutton', ...
     'String', 'Load Files', ...
     'Position', [15 848 100 30], ...
     'Callback', @onLoadFile);
+btnLoadFolder = uicontrol('Parent', panel, 'Style', 'pushbutton', ...
+    'String', 'Load Folder', ...
+    'Position', [125 848 100 30], ...
+    'Callback', @onLoadFolder);
 
 edtFile = uicontrol('Parent', panel, 'Style', 'edit', ...
     'Enable', 'inactive', ...
@@ -187,60 +191,64 @@ lblStatus = uicontrol('Parent', panel, 'Style', 'text', ...
     'Position', [15 340 330 40]);
 
 % 右侧三幅图的类型选择与导出按钮
-lblSel1 = uicontrol('Parent', fig, 'Style', 'text', ...
+tabRight = uitabgroup('Parent', fig, 'Units', 'pixels', 'Position', [390 15 1095 860]);
+tabMain = uitab('Parent', tabRight, 'Title', 'Main');
+tabFoundation = uitab('Parent', tabRight, 'Title', 'Foundation');
+
+lblSel1 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'String', 'Plot 1:', ...
     'HorizontalAlignment', 'left', ...
     'Position', [390 870 45 22]);
-ddSel1 = uicontrol('Parent', fig, 'Style', 'popupmenu', ...
+ddSel1 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
     'String', {'Time', 'PSD', 'Trans'}, ...
     'Value', 1, ...
     'BackgroundColor', 'w', ...
     'Position', [440 868 110 24]);
-btnFig1 = uicontrol('Parent', fig, 'Style', 'pushbutton', ...
+btnFig1 = uicontrol('Parent', tabMain, 'Style', 'pushbutton', ...
     'String', 'Figure', ...
     'Position', [556 866 62 26]);
 
-lblSel2 = uicontrol('Parent', fig, 'Style', 'text', ...
+lblSel2 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'String', 'Plot 2:', ...
     'HorizontalAlignment', 'left', ...
     'Position', [390 620 45 22]);
-ddSel2 = uicontrol('Parent', fig, 'Style', 'popupmenu', ...
+ddSel2 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
     'String', {'Time', 'PSD', 'Trans'}, ...
     'Value', 2, ...
     'BackgroundColor', 'w', ...
     'Position', [440 618 110 24]);
-btnFig2 = uicontrol('Parent', fig, 'Style', 'pushbutton', ...
+btnFig2 = uicontrol('Parent', tabMain, 'Style', 'pushbutton', ...
     'String', 'Figure', ...
     'Position', [556 616 62 26]);
 
-lblSel3 = uicontrol('Parent', fig, 'Style', 'text', ...
+lblSel3 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'String', 'Plot 3:', ...
     'HorizontalAlignment', 'left', ...
     'Position', [390 370 45 22]);
-ddSel3 = uicontrol('Parent', fig, 'Style', 'popupmenu', ...
+ddSel3 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
     'String', {'Time', 'PSD', 'Trans'}, ...
     'Value', 3, ...
     'BackgroundColor', 'w', ...
     'Position', [440 368 110 24]);
-btnFig3 = uicontrol('Parent', fig, 'Style', 'pushbutton', ...
+btnFig3 = uicontrol('Parent', tabMain, 'Style', 'pushbutton', ...
     'String', 'Figure', ...
     'Position', [556 366 62 26]);
 
 % 三个主绘图区：时域、PSD、传递率
-axMain1 = axes('Parent', fig, 'Units', 'pixels', 'Position', [390 645 1095 215], 'Box', 'on');
+axMain1 = axes('Parent', tabMain, 'Units', 'pixels', 'Position', [20 585 1030 235], 'Box', 'on');
 title(axMain1, 'Time Domain');
 xlabel(axMain1, 'Time (s)');
 ylabel(axMain1, 'Acceleration (m/s^2)');
 grid(axMain1, 'on');
 
-axMain2 = axes('Parent', fig, 'Units', 'pixels', 'Position', [390 395 1095 215], 'Box', 'on');
+axMain2 = axes('Parent', tabMain, 'Units', 'pixels', 'Position', [20 325 1030 235], 'Box', 'on');
 title(axMain2, 'PSD');
 xlabel(axMain2, 'Frequency (Hz)');
 ylabel(axMain2, '(m/s^2)^2/Hz');
 set(axMain2, 'XScale', 'log', 'YScale', 'log');
 grid(axMain2, 'on');
 
-axMain3 = axes('Parent', fig, 'Units', 'pixels', 'Position', [390 145 1095 215], 'Box', 'on');
+axMain3 = axes('Parent', tabMain, 'Units', 'pixels', 'Position', [20 65 1030 235], 'Box', 'on');
 title(axMain3, 'Transmissibility (dB)');
 xlabel(axMain3, 'Frequency (Hz)');
 ylabel(axMain3, 'dB');
@@ -248,9 +256,97 @@ set(axMain3, 'XScale', 'log', 'YScale', 'linear');
 grid(axMain3, 'on');
 
 % 每幅图旁边的 Figure 按钮：导出当前图到单独窗口
+lblVibFile = uicontrol('Parent', tabFoundation, 'Style', 'text', ...
+    'String', 'Vib File:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [20 820 60 22]);
+ddVibFile = uicontrol('Parent', tabFoundation, 'Style', 'popupmenu', ...
+    'String', {'(none)'}, ...
+    'Value', 1, ...
+    'Enable', 'off', ...
+    'BackgroundColor', 'w', ...
+    'UserData', NaN, ...
+    'Callback', @onFoundationSourceChanged, ...
+    'Position', [82 818 250 24]);
+
+lblStiffFile = uicontrol('Parent', tabFoundation, 'Style', 'text', ...
+    'String', 'Stiff File:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [350 820 68 22]);
+ddStiffFile = uicontrol('Parent', tabFoundation, 'Style', 'popupmenu', ...
+    'String', {'(none)'}, ...
+    'Value', 1, ...
+    'Enable', 'off', ...
+    'BackgroundColor', 'w', ...
+    'UserData', NaN, ...
+    'Callback', @onFoundationSourceChanged, ...
+    'Position', [420 818 250 24]);
+
+lblVibCh = uicontrol('Parent', tabFoundation, 'Style', 'text', ...
+    'String', 'Vib Ch:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [20 786 52 22]);
+edtVibCh = uicontrol('Parent', tabFoundation, 'Style', 'edit', ...
+    'String', '2,3,4', ...
+    'BackgroundColor', 'w', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [74 782 120 28]);
+
+lblExciteCh = uicontrol('Parent', tabFoundation, 'Style', 'text', ...
+    'String', 'Excite Ch:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [220 786 66 22]);
+edtExciteCh = uicontrol('Parent', tabFoundation, 'Style', 'edit', ...
+    'String', '1', ...
+    'BackgroundColor', 'w', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [288 782 55 28]);
+
+lblRespCh = uicontrol('Parent', tabFoundation, 'Style', 'text', ...
+    'String', 'Resp Ch:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [360 786 60 22]);
+edtRespCh = uicontrol('Parent', tabFoundation, 'Style', 'edit', ...
+    'String', '4', ...
+    'BackgroundColor', 'w', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [422 782 55 28]);
+
+chkVCA = uicontrol('Parent', tabFoundation, 'Style', 'checkbox', ...
+    'String', 'VC A', ...
+    'Value', 1, ...
+    'Position', [510 784 58 22]);
+chkVCB = uicontrol('Parent', tabFoundation, 'Style', 'checkbox', ...
+    'String', 'VC B', ...
+    'Value', 1, ...
+    'Position', [570 784 58 22]);
+chkVCC = uicontrol('Parent', tabFoundation, 'Style', 'checkbox', ...
+    'String', 'VC C', ...
+    'Value', 1, ...
+    'Position', [630 784 58 22]);
+chkVCD = uicontrol('Parent', tabFoundation, 'Style', 'checkbox', ...
+    'String', 'VC D', ...
+    'Value', 1, ...
+    'Position', [690 784 58 22]);
+
+axFoundVib = axes('Parent', tabFoundation, 'Units', 'pixels', 'Position', [20 390 1030 360], 'Box', 'on');
+title(axFoundVib, 'Floor Vibration (One-Third Octave)');
+xlabel(axFoundVib, 'One-Third Octave Band Frequency [Hz]');
+ylabel(axFoundVib, 'RMS Velocity [um/s]');
+set(axFoundVib, 'XScale', 'log', 'YScale', 'log');
+grid(axFoundVib, 'on');
+
+axFoundStiff = axes('Parent', tabFoundation, 'Units', 'pixels', 'Position', [20 65 1030 300], 'Box', 'on');
+title(axFoundStiff, 'Dynamic Stiffness');
+xlabel(axFoundStiff, 'Frequency [Hz]');
+ylabel(axFoundStiff, 'Magnitude [N/m]');
+set(axFoundStiff, 'XScale', 'log', 'YScale', 'log');
+grid(axFoundStiff, 'on');
+
 set(btnFig1, 'Callback', @(~, ~) onOpenAxisFigure(axMain1, 'Plot 1'));
 set(btnFig2, 'Callback', @(~, ~) onOpenAxisFigure(axMain2, 'Plot 2'));
 set(btnFig3, 'Callback', @(~, ~) onOpenAxisFigure(axMain3, 'Plot 3'));
+refreshFoundationFileSelectors();
 
 % 绑定窗口尺寸变化回调并执行一次初始布局
 set(fig, 'ResizeFcn', @onResize);
@@ -289,13 +385,14 @@ onResize();
         fsW = 70;
 
         set(btnLoad, 'Position', [xPad, topY, loadW, rowH]);
+        set(btnLoadFolder, 'Position', [xPad, topY - 34, loadW, rowH]);
         fsX = pw - xPad - fsW;
         fsLblX = fsX - 55;
 
         set(edtFs, 'Position', [fsX, topY, fsW, rowH]);
         set(lblFs, 'Position', [fsLblX, topY + 4, 55, 22]);
 
-        fileY = topY - 44;
+        fileY = topY - 78;
         set(edtFile, 'Position', [xPad, fileY, pw - 2 * xPad, 30]);
         listW = pw - 2 * xPad;
 
@@ -314,7 +411,7 @@ onResize();
         set(ddPsdSource, 'Position', [xPad + psdLabelW + 4, psdSrcY, listW - psdLabelW - 4, 24]);
 
         listLabelY = psdSrcY - 36;
-        listH = max(110, min(240, ph - 500));
+        listH = max(90, min(180, ph - 570));
         listY = listLabelY - 6 - listH;
 
         set(lstData, 'Position', [xPad, listY, listW, listH]);
@@ -367,48 +464,114 @@ onResize();
         set(btnReset, 'Position', [btnX1, btnY2, btnW, 32]);
         set(btnClear, 'Position', [btnX2, btnY2, btnW, 32]);
 
-        set(lblStatus, 'Position', [xPad, btnY2 - 52, pw - 2 * xPad, 40]);
+        set(lblStatus, 'Position', [xPad, btnY2 - 44, pw - 2 * xPad, 36]);
 
-        % Right plot area
+        % Right side tab group area.
         rightXFig = margin + leftW + gapLR;
         rightMargin = 10;
-        rightTopPad = 8;
-        rightBottomPad = 10;
-        axesLeftPad = 8;
-        axesRightPad = 4;
         rightW = max(420, fw - rightXFig - rightMargin);
-        rightH = max(430, fh - rightTopPad - rightBottomPad);
-        rowGap = 6;
+        rightH = max(430, fh - 2 * margin);
+        set(tabRight, 'Position', [rightXFig, margin, rightW, rightH]);
+
+        tabPos = get(tabRight, 'Position');
+        tw = tabPos(3);
+        th = tabPos(4);
+
+        % Main tab layout (3 stacked plots).
+        mPadX = 8;
+        mTopPad = 30;
+        mBottomPad = 8;
+        mRowGap = 8;
         selH = 24;
-        rowH = floor((rightH - 2 * rowGap) / 3);
-        axH = max(110, rowH - selH - 8);
+        rowH = floor((th - mTopPad - mBottomPad - 2 * mRowGap) / 3);
+        axH = max(95, rowH - selH - 8);
+        axX = mPadX;
+        axW = max(360, tw - 2 * mPadX);
+        selLabelW = 45;
         selW = 110;
         figBtnW = 62;
-        selLabelW = 45;
-        selLabelX = rightXFig;
+        selLabelX = mPadX;
         selX = selLabelX + selLabelW + 6;
         figBtnX = selX + selW + 6;
-        axX = rightXFig + axesLeftPad;
-        axW = max(380, rightW - axesLeftPad - axesRightPad);
 
-        top1 = rightBottomPad + 2 * (rowH + rowGap);
-        top2 = rightBottomPad + rowH + rowGap;
-        top3 = rightBottomPad;
+        top1 = th - mTopPad - rowH;
+        top2 = top1 - mRowGap - rowH;
+        top3 = top2 - mRowGap - rowH;
 
-        set(lblSel1, 'Position', [selLabelX, top1 + axH + 4, selLabelW, 22]);
-        set(ddSel1, 'Position', [selX, top1 + axH + 2, selW, selH]);
-        set(btnFig1, 'Position', [figBtnX, top1 + axH + 1, figBtnW, 26]);
+        set(lblSel1, 'Position', [selLabelX, top1 + rowH - selH + 2, selLabelW, 22]);
+        set(ddSel1, 'Position', [selX, top1 + rowH - selH, selW, selH]);
+        set(btnFig1, 'Position', [figBtnX, top1 + rowH - selH - 1, figBtnW, 26]);
         set(axMain1, 'OuterPosition', [axX, top1, axW, axH]);
 
-        set(lblSel2, 'Position', [selLabelX, top2 + axH + 4, selLabelW, 22]);
-        set(ddSel2, 'Position', [selX, top2 + axH + 2, selW, selH]);
-        set(btnFig2, 'Position', [figBtnX, top2 + axH + 1, figBtnW, 26]);
+        set(lblSel2, 'Position', [selLabelX, top2 + rowH - selH + 2, selLabelW, 22]);
+        set(ddSel2, 'Position', [selX, top2 + rowH - selH, selW, selH]);
+        set(btnFig2, 'Position', [figBtnX, top2 + rowH - selH - 1, figBtnW, 26]);
         set(axMain2, 'OuterPosition', [axX, top2, axW, axH]);
 
-        set(lblSel3, 'Position', [selLabelX, top3 + axH + 4, selLabelW, 22]);
-        set(ddSel3, 'Position', [selX, top3 + axH + 2, selW, selH]);
-        set(btnFig3, 'Position', [figBtnX, top3 + axH + 1, figBtnW, 26]);
+        set(lblSel3, 'Position', [selLabelX, top3 + rowH - selH + 2, selLabelW, 22]);
+        set(ddSel3, 'Position', [selX, top3 + rowH - selH, selW, selH]);
+        set(btnFig3, 'Position', [figBtnX, top3 + rowH - selH - 1, figBtnW, 26]);
         set(axMain3, 'OuterPosition', [axX, top3, axW, axH]);
+
+        % Foundation tab layout.
+        fPadX = 12;
+        fTopY = th - 68;
+        fBottomPad = 10;
+        labelVibW = 58;
+        labelStiffW = 66;
+        fileGap = 10;
+        filePopW = max(80, floor((tw - 2 * fPadX - labelVibW - labelStiffW - fileGap - 12) / 2));
+        vibPopX = fPadX + labelVibW + 4;
+        stiffLblX = vibPopX + filePopW + fileGap;
+        stiffPopX = stiffLblX + labelStiffW + 4;
+
+        set(lblVibFile, 'Position', [fPadX, fTopY + 2, labelVibW, 22]);
+        set(ddVibFile, 'Position', [vibPopX, fTopY, filePopW, 24]);
+        set(lblStiffFile, 'Position', [stiffLblX, fTopY + 2, labelStiffW, 22]);
+        set(ddStiffFile, 'Position', [stiffPopX, fTopY, filePopW, 24]);
+
+        row2Y = fTopY - 34;
+        cfgGap = 6;
+        vibLblW = 46; vibEditW = 88;
+        exLblW = 60; exEditW = 46;
+        rpLblW = 54; rpEditW = 46;
+        x0 = fPadX;
+        set(lblVibCh, 'Position', [x0, row2Y + 2, vibLblW, 22]);
+        x0 = x0 + vibLblW + 2;
+        set(edtVibCh, 'Position', [x0, row2Y, vibEditW, 28]);
+        x0 = x0 + vibEditW + cfgGap;
+        set(lblExciteCh, 'Position', [x0, row2Y + 2, exLblW, 22]);
+        x0 = x0 + exLblW + 2;
+        set(edtExciteCh, 'Position', [x0, row2Y, exEditW, 28]);
+        x0 = x0 + exEditW + cfgGap;
+        set(lblRespCh, 'Position', [x0, row2Y + 2, rpLblW, 22]);
+        x0 = x0 + rpLblW + 2;
+        set(edtRespCh, 'Position', [x0, row2Y, rpEditW, 28]);
+
+        row3Y = row2Y - 30;
+        vcGap = 8;
+        vcW = 56;
+        vcX = fPadX;
+        set(chkVCA, 'Position', [vcX, row3Y + 2, vcW, 22]);
+        vcX = vcX + vcW + vcGap;
+        set(chkVCB, 'Position', [vcX, row3Y + 2, vcW, 22]);
+        vcX = vcX + vcW + vcGap;
+        set(chkVCC, 'Position', [vcX, row3Y + 2, vcW, 22]);
+        vcX = vcX + vcW + vcGap;
+        set(chkVCD, 'Position', [vcX, row3Y + 2, vcW, 22]);
+
+        fAxGap = 8;
+        fAxTop = row3Y - 8;
+        fAxAvailH = max(220, fAxTop - fBottomPad);
+        fAxTopH = floor((fAxAvailH - fAxGap) / 2);
+        fAxBottomH = fAxAvailH - fAxGap - fAxTopH;
+        fAxX = fPadX;
+        fAxW = max(360, tw - 2 * fPadX);
+        fAxBottomY = fBottomPad;
+        fAxTopY = fAxBottomY + fAxBottomH + fAxGap;
+
+        set(axFoundVib, 'OuterPosition', [fAxX, fAxTopY, fAxW, fAxTopH]);
+        set(axFoundStiff, 'OuterPosition', [fAxX, fAxBottomY, fAxW, fAxBottomH]);
     end
 
     % 加载数据文件（支持多选），并重建“数据项列表”
@@ -435,17 +598,45 @@ onResize();
             fileList = fname;
         end
 
+        [app, loadedNow, failedNow, lastErr] = loadFilesByNameList(app, fileList, fpath);
+        app.lastOpenDir = fpath;
+        finalizeLoadResult(app, loadedNow, failedNow, lastErr, 'file(s)');
+    end
+
+    % 主绘图入口：按所选数据项与图类型刷新三幅图
+    function onLoadFolder(~, ~)
+        app = getappdata(fig, 'app');
+        startDir = app.lastOpenDir;
+        if isempty(startDir) || ~isDirCompat(startDir)
+            startDir = pwd;
+        end
+
+        folderPath = uigetdir(startDir, 'Select a folder containing data files');
+        if isequal(folderPath, 0)
+            return;
+        end
+
+        fileList = listSupportedFilesInFolder(folderPath);
+        if isempty(fileList)
+            showAlertCompat(fig, 'No supported data files found in the selected folder.', 'Load folder');
+            return;
+        end
+
+        [app, loadedNow, failedNow, lastErr] = loadFilesByNameList(app, fileList, folderPath);
+        app.lastOpenDir = folderPath;
+        finalizeLoadResult(app, loadedNow, failedNow, lastErr, 'file(s) from folder');
+    end
+
+    function [app, loadedNow, failedNow, lastErr] = loadFilesByNameList(app, fileList, rootPath)
         set(lblStatus, 'String', sprintf('Status: loading %d file(s)...', numel(fileList)));
         drawnow;
 
-        app.lastOpenDir = fpath;
         loadedNow = 0;
         failedNow = 0;
         lastErr = '';
-
         for i = 1:numel(fileList)
             oneFile = fileList{i};
-            fullName = fullfile(fpath, oneFile);
+            fullName = fullfile(rootPath, oneFile);
             try
                 D = readVibrationFile(fullName, getNumericControlValue(edtFs, 1000));
                 D.filePath = fullName;
@@ -460,7 +651,9 @@ onResize();
                 lastErr = ME.message;
             end
         end
+    end
 
+    function finalizeLoadResult(app, loadedNow, failedNow, lastErr, srcLabel)
         if ~isempty(app.files)
             app.validChannels = collectValidChannels(app.files);
             app.fs = app.files{end}.fs;
@@ -470,10 +663,10 @@ onResize();
 
         setappdata(fig, 'app', app);
         refreshLoadedFilesList();
+        refreshFoundationFileSelectors();
 
-        cla(axMain1);
-        cla(axMain2);
-        cla(axMain3);
+        cla(axMain1); cla(axMain2); cla(axMain3);
+        cla(axFoundVib); cla(axFoundStiff);
 
         if isempty(app.files)
             showAlertCompat(fig, 'No files were loaded successfully.', 'Load failed');
@@ -487,17 +680,60 @@ onResize();
 
         set(edtFile, 'String', summarizeLoadedFiles(app.files));
         if failedNow > 0
-            set(lblStatus, 'String', sprintf('Status: loaded %d file(s), failed %d | last error: %s', loadedNow, failedNow, lastErr));
+            set(lblStatus, 'String', sprintf('Status: loaded %d %s, failed %d | last error: %s', loadedNow, srcLabel, failedNow, lastErr));
         else
-            set(lblStatus, 'String', sprintf('Status: loaded %d file(s) | generated %d data entries', loadedNow, numel(app.series)));
+            set(lblStatus, 'String', sprintf('Status: loaded %d %s | generated %d data entries', loadedNow, srcLabel, numel(app.series)));
         end
     end
 
-    % 主绘图入口：按所选数据项与图类型刷新三幅图
+    function fileList = listSupportedFilesInFolder(folderPath)
+        fileList = {};
+        if isempty(folderPath) || ~isDirCompat(folderPath)
+            return;
+        end
+
+        entries = dir(folderPath);
+        exts = {'.vna', '.mat', '.txt', '.dat', '.csv', '.xlsx'};
+        names = {};
+        for i = 1:numel(entries)
+            one = entries(i);
+            if one.isdir
+                continue;
+            end
+            [~, ~, ext] = fileparts(one.name);
+            if any(strcmpi(ext, exts))
+                names{end + 1} = one.name; %#ok<AGROW>
+            end
+        end
+
+        if isempty(names)
+            return;
+        end
+        fileList = unique(names, 'stable');
+    end
+
+    function onFoundationSourceChanged(~, ~)
+        app = getappdata(fig, 'app');
+        if ~app.loaded || isempty(app.files)
+            return;
+        end
+        if ~isFoundationTabSelected(tabRight, tabFoundation)
+            return;
+        end
+        % Source selection should immediately refresh foundation plots.
+        plotFoundationPage(app, false, true);
+    end
+
     function onPlot(~, ~)
         app = getappdata(fig, 'app');
         if ~app.loaded || isempty(app.files)
             showAlertCompat(fig, 'Please load data first.', 'Tip');
+            return;
+        end
+
+        keepExisting = logical(get(btnHold, 'Value'));
+        if isFoundationTabSelected(tabRight, tabFoundation)
+            plotFoundationPage(app, keepExisting, false);
             return;
         end
 
@@ -516,7 +752,6 @@ onResize();
         psdSourceMode = getPopupSelection(ddPsdSource);
 
         refInput = 1;
-        keepExisting = logical(get(btnHold, 'Value'));
         if ~keepExisting
             cla(axMain1); cla(axMain2); cla(axMain3);
         end
@@ -833,7 +1068,9 @@ onResize();
     % 清空三幅图，并按当前图类型恢复空图状态
     function onClearPlots(~, ~)
         cla(axMain1); cla(axMain2); cla(axMain3);
+        cla(axFoundVib); cla(axFoundStiff);
         legend(axMain1, 'off'); legend(axMain2, 'off'); legend(axMain3, 'off');
+        legend(axFoundVib, 'off'); legend(axFoundStiff, 'off');
         renderOneAxis(axMain1, getPopupSelection(ddSel1), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
         renderOneAxis(axMain2, getPopupSelection(ddSel2), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
         renderOneAxis(axMain3, getPopupSelection(ddSel3), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
@@ -896,6 +1133,8 @@ onResize();
 
         setappdata(fig, 'app', app);
         refreshLoadedFilesList();
+        refreshFoundationFileSelectors();
+        cla(axFoundVib); cla(axFoundStiff);
         set(lblStatus, 'String', sprintf('Status: deleted %d entries, remaining %d', removed, numel(app.series)));
     end
 
@@ -920,6 +1159,160 @@ onResize();
         setListSelectionByLabels(lstData, items, selectedLabels);
         onDataSelectionChanged();
     end
+
+    % Refresh Vib/Stiff source file dropdowns in Foundation tab.
+    function refreshFoundationFileSelectors(preferredVibId, preferredStiffId)
+        if nargin < 1
+            preferredVibId = NaN;
+        end
+        if nargin < 2
+            preferredStiffId = NaN;
+        end
+
+        app = getappdata(fig, 'app');
+        currentVibId = getPopupSelectedFileIdCompat(ddVibFile);
+        currentStiffId = getPopupSelectedFileIdCompat(ddStiffFile);
+        if ~isfinite(preferredVibId)
+            preferredVibId = currentVibId;
+        end
+        if ~isfinite(preferredStiffId)
+            preferredStiffId = currentStiffId;
+        end
+
+        if isempty(app.files)
+            set(ddVibFile, 'String', {'(none)'}, 'Value', 1, 'Enable', 'off', 'UserData', NaN);
+            set(ddStiffFile, 'String', {'(none)'}, 'Value', 1, 'Enable', 'off', 'UserData', NaN);
+            return;
+        end
+
+        n = numel(app.files);
+        items = cell(1, n + 1);
+        ids = nan(1, n + 1);
+        items{1} = '(none)';
+        ids(1) = NaN;
+        for i = 1:n
+            F = app.files{i};
+            ids(i + 1) = F.id;
+            items{i + 1} = sprintf('%s [id:%d]', F.fileName, F.id);
+        end
+
+        vibIdx = find(ids == preferredVibId, 1, 'first');
+        vibFallback = false;
+        if isempty(vibIdx)
+            vibIdx = 1;
+            vibFallback = isfinite(preferredVibId);
+        end
+        stiffIdx = find(ids == preferredStiffId, 1, 'first');
+        stiffFallback = false;
+        if isempty(stiffIdx)
+            stiffIdx = 1;
+            stiffFallback = isfinite(preferredStiffId);
+        end
+
+        set(ddVibFile, 'String', items, 'Value', vibIdx, 'Enable', 'on', 'UserData', ids);
+        set(ddStiffFile, 'String', items, 'Value', stiffIdx, 'Enable', 'on', 'UserData', ids);
+        if vibFallback || stiffFallback
+            set(lblStatus, 'String', 'Status: foundation source file selection reset to (none)');
+        end
+    end
+
+    function fileId = getPopupSelectedFileIdCompat(h)
+        fileId = NaN;
+        try
+            ids = get(h, 'UserData');
+            idx = get(h, 'Value');
+            if isnumeric(ids) && ~isempty(ids) && idx >= 1 && idx <= numel(ids)
+                oneId = ids(idx);
+                if isfinite(oneId)
+                    fileId = oneId;
+                end
+            end
+        catch
+        end
+    end
+
+    function tf = isFoundationTabSelected(tabGroup, foundationTab)
+        tf = false;
+        try
+            tf = isequal(get(tabGroup, 'SelectedTab'), foundationTab);
+        catch
+            tf = false;
+        end
+    end
+
+    function plotFoundationPage(app, keepExisting, silentNoSource)
+        if nargin < 3
+            silentNoSource = false;
+        end
+        vibFileId = getPopupSelectedFileIdCompat(ddVibFile);
+        stiffFileId = getPopupSelectedFileIdCompat(ddStiffFile);
+        if ~isfinite(vibFileId) && ~isfinite(stiffFileId)
+            if ~silentNoSource
+                showAlertCompat(fig, 'Please select Vib File or Stiff File first.', 'Tip');
+            end
+            set(lblStatus, 'String', 'Status: foundation source is empty');
+            return;
+        end
+
+        [vibChannels, vibErr] = parseChannelListString(get(edtVibCh, 'String'));
+        if ~isempty(vibErr)
+            showAlertCompat(fig, vibErr, 'Foundation Setting Error');
+            return;
+        end
+        [exciteCh, exciteErr] = parsePositiveIntString(get(edtExciteCh, 'String'), 'Excite Ch');
+        if ~isempty(exciteErr)
+            showAlertCompat(fig, exciteErr, 'Foundation Setting Error');
+            return;
+        end
+        [respCh, respErr] = parsePositiveIntString(get(edtRespCh, 'String'), 'Resp Ch');
+        if ~isempty(respErr)
+            showAlertCompat(fig, respErr, 'Foundation Setting Error');
+            return;
+        end
+
+        if ~keepExisting
+            cla(axFoundVib);
+            cla(axFoundStiff);
+        end
+
+        vcFlags = struct( ...
+            'A', logical(get(chkVCA, 'Value')), ...
+            'B', logical(get(chkVCB, 'Value')), ...
+            'C', logical(get(chkVCC, 'Value')), ...
+            'D', logical(get(chkVCD, 'Value')));
+
+        [Fvib, okVib] = getFileById(app.files, vibFileId);
+        [Fstiff, okStiff] = getFileById(app.files, stiffFileId);
+        msgParts = {};
+
+        if okVib
+            [ok, msg] = renderFoundationVibrationAxis(axFoundVib, Fvib, vibChannels, vcFlags, keepExisting);
+            if ok
+                msgParts{end + 1} = sprintf('vib:%s', Fvib.fileName); %#ok<AGROW>
+            elseif ~isempty(msg)
+                msgParts{end + 1} = ['vib skipped (' msg ')']; %#ok<AGROW>
+            end
+        else
+            msgParts{end + 1} = 'vib file unavailable'; %#ok<AGROW>
+        end
+
+        if okStiff
+            [ok, msg] = renderFoundationStiffnessAxis(axFoundStiff, Fstiff, exciteCh, respCh, keepExisting);
+            if ok
+                msgParts{end + 1} = sprintf('stiff:%s', Fstiff.fileName); %#ok<AGROW>
+            elseif ~isempty(msg)
+                msgParts{end + 1} = ['stiff skipped (' msg ')']; %#ok<AGROW>
+            end
+        else
+            msgParts{end + 1} = 'stiff file unavailable'; %#ok<AGROW>
+        end
+
+        if isempty(msgParts)
+            set(lblStatus, 'String', 'Status: foundation plot skipped');
+        else
+            set(lblStatus, 'String', ['Status: foundation plotted | ' strjoin(msgParts, ', ')]);
+        end
+    end
 end
 
 % 创建应用状态结构体（集中保存 UI 和数据处理状态）
@@ -943,7 +1336,8 @@ app.vna = struct( ...
     'aspec', {{}}, ...
     'eu', 1, ...
     'wincor', 1, ...
-    'rbw', 1);
+    'rbw', 1, ...
+    'xcmeas', []);
 end
 
 % 按文件扩展名读取数据并统一转成内部数据结构
@@ -1036,7 +1430,8 @@ vna = struct( ...
     'aspec', {cell(1, nCh)}, ...
     'eu', ones(1, nCh), ...
     'wincor', 1, ...
-    'rbw', 1);
+    'rbw', 1, ...
+    'xcmeas', []);
 
 if isfield(slm, 'fdxvec') && ~isempty(slm.fdxvec)
     vna.freq = slm.fdxvec(:);
@@ -1046,6 +1441,9 @@ if isfield(slm, 'wincor') && isfinite(slm.wincor)
 end
 if isfield(slm, 'rbw') && isfinite(slm.rbw) && slm.rbw > 0
     vna.rbw = slm.rbw;
+end
+if isfield(slm, 'xcmeas') && ~isempty(slm.xcmeas)
+    vna.xcmeas = slm.xcmeas;
 end
 
 for ch = 1:nCh
@@ -1171,6 +1569,395 @@ end
 
 % 解析通用数值矩阵文件（时间列/数据列）并推断采样率
 % Parse time range inputs. Empty value means open-ended boundary.
+function [F, ok] = getFileById(files, fileId)
+F = [];
+ok = false;
+if ~isfinite(fileId) || isempty(files)
+    return;
+end
+for i = 1:numel(files)
+    one = files{i};
+    if isfield(one, 'id') && isfinite(one.id) && one.id == fileId
+        F = one;
+        ok = true;
+        return;
+    end
+end
+end
+
+function [channels, errMsg] = parseChannelListString(raw)
+channels = [];
+errMsg = '';
+
+if iscell(raw)
+    if isempty(raw)
+        raw = '';
+    else
+        raw = raw{1};
+    end
+end
+if isempty(raw)
+    errMsg = 'Vib Ch cannot be empty. Example: 2,3,4';
+    return;
+end
+if ~ischar(raw)
+    errMsg = 'Vib Ch must be text like 2,3,4.';
+    return;
+end
+
+txt = strtrim(strrep(raw, '，', ','));
+if isempty(txt)
+    errMsg = 'Vib Ch cannot be empty. Example: 2,3,4';
+    return;
+end
+
+parts = regexp(txt, '[,\s;]+', 'split');
+vals = zeros(1, numel(parts));
+k = 0;
+for i = 1:numel(parts)
+    p = strtrim(parts{i});
+    if isempty(p)
+        continue;
+    end
+    v = str2double(p);
+    if ~isfinite(v) || v < 1 || abs(v - round(v)) > 1e-9
+        errMsg = sprintf('Invalid channel token: %s', p);
+        return;
+    end
+    k = k + 1;
+    vals(k) = round(v);
+end
+vals = vals(1:k);
+if isempty(vals)
+    errMsg = 'Vib Ch cannot be empty. Example: 2,3,4';
+    return;
+end
+channels = unique(vals, 'stable');
+end
+
+function [value, errMsg] = parsePositiveIntString(raw, fieldName)
+value = NaN;
+errMsg = '';
+if iscell(raw)
+    if isempty(raw)
+        raw = '';
+    else
+        raw = raw{1};
+    end
+end
+if isempty(raw) || ~ischar(raw)
+    errMsg = sprintf('%s must be a positive integer.', fieldName);
+    return;
+end
+v = str2double(strtrim(raw));
+if ~isfinite(v) || v < 1 || abs(v - round(v)) > 1e-9
+    errMsg = sprintf('%s must be a positive integer.', fieldName);
+    return;
+end
+value = round(v);
+end
+
+function [ok, msg] = renderFoundationVibrationAxis(ax, F, vibChannels, vcFlags, keepExisting)
+ok = false;
+msg = '';
+styleAxisCompat(ax);
+set(ax, 'XScale', 'log', 'YScale', 'log', 'XLimMode', 'auto', 'YLimMode', 'auto');
+
+if ~isfield(F, 'vna') || ~isfield(F.vna, 'freq') || isempty(F.vna.freq)
+    msg = 'missing fdxvec';
+    title(ax, 'Floor Vibration (missing fdxvec)');
+    return;
+end
+if ~isfield(F.vna, 'aspec') || isempty(F.vna.aspec)
+    msg = 'missing scmeas.aspec';
+    title(ax, 'Floor Vibration (missing aspec)');
+    return;
+end
+rbw = F.vna.rbw;
+if ~isfinite(rbw) || rbw <= 0
+    msg = 'invalid rbw';
+    title(ax, 'Floor Vibration (invalid rbw)');
+    return;
+end
+
+fAll = F.vna.freq(:);
+fAll = fAll(isfinite(fAll) & fAll > 0);
+if numel(fAll) < 2
+    msg = 'not enough positive frequency points';
+    title(ax, 'Floor Vibration (insufficient frequency points)');
+    return;
+end
+
+[fc, fcL, fcU, bandErr] = getThirdOctaveBandsCompat(min(fAll), max(fAll));
+if isempty(fc)
+    msg = bandErr;
+    if isempty(msg)
+        msg = 'third-octave bands unavailable';
+    end
+    title(ax, 'Floor Vibration (third-octave bands unavailable)');
+    return;
+end
+
+hold(ax, 'on');
+colorIdx = countLineLikeChildren(ax) + 1;
+anyData = false;
+xMin = inf;
+xMax = -inf;
+yMin = inf;
+yMax = -inf;
+
+for i = 1:numel(vibChannels)
+    ch = vibChannels(i);
+    if ch < 1 || ch > F.vna.nCh
+        continue;
+    end
+    aRaw = safeCellGet(F.vna.aspec, ch);
+    if isempty(aRaw)
+        continue;
+    end
+    M = min(numel(F.vna.freq), numel(aRaw));
+    if M < 2
+        continue;
+    end
+    f = F.vna.freq(1:M);
+    eu = safeGet(F.vna.eu, ch, 1);
+    aPsd = aRaw(1:M) * (eu ^ 2) / rbw;
+    valid = isfinite(f) & isfinite(aPsd) & (f > 0) & (aPsd > 0);
+    f = f(valid);
+    aPsd = aPsd(valid);
+    if numel(f) < 2
+        continue;
+    end
+    vSpec = aPsd ./ ((2 * pi * f) .^ 2);
+
+    v31 = nan(size(fc));
+    for bi = 1:numel(fc)
+        idx = (f >= fcL(bi)) & (f <= fcU(bi));
+        if any(idx)
+            v31(bi) = sqrt(sum(vSpec(idx) * rbw));
+        end
+    end
+    y = v31 * 1e6;
+    valid31 = isfinite(fc) & isfinite(y) & (fc > 0) & (y > 0);
+    if ~any(valid31)
+        continue;
+    end
+    safeLoglog(ax, fc(valid31), y(valid31), '.-', ...
+        'LineWidth', 1.1, ...
+        'Color', getSeriesColor(colorIdx), ...
+        'DisplayName', getFoundationVibLegendName(ch));
+    colorIdx = colorIdx + 1;
+    anyData = true;
+    xMin = min(xMin, min(fc(valid31)));
+    xMax = max(xMax, max(fc(valid31)));
+    yMin = min(yMin, min(y(valid31)));
+    yMax = max(yMax, max(y(valid31)));
+end
+
+fRef = [4 8 80];
+if vcFlags.A
+    safeLoglog(ax, fRef, [100 50 50], '--', 'LineWidth', 1.5, 'Color', [0.2 0.2 0.2], 'DisplayName', 'VC A');
+    xMin = min(xMin, min(fRef)); xMax = max(xMax, max(fRef));
+    yMin = min(yMin, min([100 50 50])); yMax = max(yMax, max([100 50 50]));
+end
+if vcFlags.B
+    safeLoglog(ax, fRef, [50 25 25], '--', 'LineWidth', 1.5, 'Color', [0.10 0.40 0.85], 'DisplayName', 'VC B');
+    xMin = min(xMin, min(fRef)); xMax = max(xMax, max(fRef));
+    yMin = min(yMin, min([50 25 25])); yMax = max(yMax, max([50 25 25]));
+end
+if vcFlags.C
+    safeLoglog(ax, fRef, [12.5 12.5 12.5], '--', 'LineWidth', 1.5, 'Color', [0.85 0.20 0.20], 'DisplayName', 'VC C');
+    xMin = min(xMin, min(fRef)); xMax = max(xMax, max(fRef));
+    yMin = min(yMin, min([12.5 12.5 12.5])); yMax = max(yMax, max([12.5 12.5 12.5]));
+end
+if vcFlags.D
+    safeLoglog(ax, fRef, [6.25 6.25 6.25], '--', 'LineWidth', 1.5, 'Color', [0.15 0.60 0.20], 'DisplayName', 'VC D');
+    xMin = min(xMin, min(fRef)); xMax = max(xMax, max(fRef));
+    yMin = min(yMin, min([6.25 6.25 6.25])); yMax = max(yMax, max([6.25 6.25 6.25]));
+end
+
+hold(ax, 'off');
+grid(ax, 'on');
+xlabel(ax, 'One-Third Octave Band Frequency [Hz]');
+ylabel(ax, 'RMS Velocity [um/s]');
+title(ax, sprintf('Floor Vibration - %s', F.fileName));
+legend(ax, 'show', 'Location', 'northwest');
+
+if ~keepExisting
+    if isfinite(xMin) && isfinite(xMax) && xMax > xMin
+        xlim(ax, [max(eps, xMin * 0.9), xMax * 1.1]);
+    end
+    if isfinite(yMin) && isfinite(yMax) && yMax > yMin
+        ylim(ax, [max(eps, yMin * 0.85), yMax * 1.15]);
+    end
+end
+
+hasCurve = anyData || vcFlags.A || vcFlags.B || vcFlags.C || vcFlags.D;
+if hasCurve
+    ok = true;
+else
+    msg = 'no valid vibration channels/aspec';
+end
+end
+
+function [ok, msg] = renderFoundationStiffnessAxis(ax, F, exciteCh, respCh, keepExisting)
+ok = false;
+msg = '';
+styleAxisCompat(ax);
+set(ax, 'XScale', 'log', 'YScale', 'log', 'XLimMode', 'auto', 'YLimMode', 'auto');
+
+if ~isfield(F, 'vna') || ~isfield(F.vna, 'freq') || isempty(F.vna.freq)
+    msg = 'missing fdxvec';
+    title(ax, 'Dynamic Stiffness (missing fdxvec)');
+    return;
+end
+if ~isfield(F.vna, 'xcmeas') || isempty(F.vna.xcmeas)
+    msg = 'missing xcmeas';
+    title(ax, 'Dynamic Stiffness (missing xcmeas)');
+    return;
+end
+
+xc = F.vna.xcmeas;
+sz = size(xc);
+if numel(sz) < 2 || exciteCh < 1 || respCh < 1 || exciteCh > sz(1) || respCh > sz(2)
+    msg = sprintf('xcmeas index out of range (%d,%d)', exciteCh, respCh);
+    title(ax, 'Dynamic Stiffness (channel out of range)');
+    return;
+end
+if ~isstruct(xc(exciteCh, respCh)) || ~isfield(xc(exciteCh, respCh), 'xfer') || isempty(xc(exciteCh, respCh).xfer)
+    msg = 'missing xcmeas(...).xfer';
+    title(ax, 'Dynamic Stiffness (missing xfer)');
+    return;
+end
+
+xfer = xc(exciteCh, respCh).xfer(:);
+M = min(numel(F.vna.freq), numel(xfer));
+if M < 2
+    msg = 'insufficient xfer points';
+    title(ax, 'Dynamic Stiffness (insufficient points)');
+    return;
+end
+f = F.vna.freq(1:M);
+x = xfer(1:M);
+euResp = safeGet(F.vna.eu, respCh, 1);
+euExc = safeGet(F.vna.eu, exciteCh, 1);
+resp = 1 ./ (x ./ ((2 * pi * f) .^ 2) * (euResp / euExc));
+kAbs = abs(resp);
+valid = isfinite(f) & isfinite(kAbs) & (f > 0) & (kAbs > 0);
+f = f(valid);
+kAbs = kAbs(valid);
+if numel(f) < 2
+    msg = 'no valid stiffness points';
+    title(ax, 'Dynamic Stiffness (no valid points)');
+    return;
+end
+
+hold(ax, 'on');
+safeLoglog(ax, f, kAbs, 'LineWidth', 1.2, ...
+    'Color', getSeriesColor(countLineLikeChildren(ax) + 1), ...
+    'DisplayName', sprintf('Measurement (%s, %d->%d)', F.fileName, exciteCh, respCh));
+safeLoglog(ax, [f(1) f(end)], [1e8 1e8], '--', 'LineWidth', 1.5, ...
+    'Color', [0.85 0.20 0.20], 'DisplayName', 'Specification (10^8 N/m)');
+hold(ax, 'off');
+
+grid(ax, 'on');
+xlabel(ax, 'Frequency [Hz]');
+ylabel(ax, 'Magnitude [N/m]');
+title(ax, sprintf('Dynamic Stiffness - %s', F.fileName));
+legend(ax, 'show', 'Location', 'northwest');
+
+if ~keepExisting
+    xlim(ax, [f(1), f(end)]);
+    yMin = min(kAbs);
+    yMax = max(kAbs);
+    if isfinite(yMin) && isfinite(yMax) && yMax > yMin
+        ylim(ax, [yMin, yMax]);
+    end
+end
+
+ok = true;
+end
+
+function [fc, fcL, fcU, errMsg] = getThirdOctaveBandsCompat(minF, maxF)
+fc = [];
+fcL = [];
+fcU = [];
+errMsg = '';
+
+if ~isfinite(minF) || ~isfinite(maxF) || minF <= 0 || maxF <= minF
+    errMsg = 'invalid frequency range';
+    return;
+end
+
+try
+    if exist('nth_freq_band', 'file') == 2
+        [fc0, fcL0, fcU0] = nth_freq_band(3, minF, maxF);
+    else
+        [fc0, fcL0, fcU0] = fallbackThirdOctaveBands(minF, maxF);
+    end
+catch
+    [fc0, fcL0, fcU0] = fallbackThirdOctaveBands(minF, maxF);
+end
+
+fc0 = fc0(:);
+fcL0 = fcL0(:);
+fcU0 = fcU0(:);
+M = min([numel(fc0), numel(fcL0), numel(fcU0)]);
+fc0 = fc0(1:M);
+fcL0 = fcL0(1:M);
+fcU0 = fcU0(1:M);
+valid = isfinite(fc0) & isfinite(fcL0) & isfinite(fcU0) & (fc0 > 0) & (fcL0 > 0) & (fcU0 > fcL0);
+fc0 = fc0(valid);
+fcL0 = fcL0(valid);
+fcU0 = fcU0(valid);
+
+if isempty(fc0)
+    errMsg = 'empty third-octave bands';
+    return;
+end
+if maxF < fcU0(end)
+    fc0 = fc0(1:end-1);
+    fcL0 = fcL0(1:end-1);
+    fcU0 = fcU0(1:end-1);
+end
+if isempty(fc0)
+    errMsg = 'empty third-octave bands';
+    return;
+end
+
+fc = fc0;
+fcL = fcL0;
+fcU = fcU0;
+end
+
+function [fc, fcL, fcU] = fallbackThirdOctaveBands(minF, maxF)
+ratio = 2^(1 / 3);
+half = sqrt(ratio);
+kMin = floor(log(minF) / log(ratio)) - 1;
+kMax = ceil(log(maxF) / log(ratio)) + 1;
+k = (kMin:kMax)';
+fc = ratio .^ k;
+fcL = fc / half;
+fcU = fc * half;
+mask = (fcU >= minF) & (fcL <= maxF);
+fc = fc(mask);
+fcL = fcL(mask);
+fcU = fcU(mask);
+end
+
+function name = getFoundationVibLegendName(ch)
+switch ch
+    case 2
+        name = 'X';
+    case 3
+        name = 'Y';
+    case 4
+        name = 'Z';
+    otherwise
+        name = sprintf('Ch%d', ch);
+end
+end
+
 function [timeWindow, errMsg] = parseTimeRangeInputs(edtStart, edtEnd)
 timeWindow = [NaN NaN];
 errMsg = '';

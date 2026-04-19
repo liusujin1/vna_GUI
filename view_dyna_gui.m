@@ -49,6 +49,36 @@ edtFs = uicontrol('Parent', panel, 'Style', 'edit', ...
     'BackgroundColor', 'w', ...
     'Position', [175 848 70 30]);
 
+lblTStart = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'Time Start (s):', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [15 810 90 22]);
+edtTStart = uicontrol('Parent', panel, 'Style', 'edit', ...
+    'String', '', ...
+    'BackgroundColor', 'w', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [105 806 70 30]);
+
+lblTEnd = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'Time End (s):', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [180 810 80 22]);
+edtTEnd = uicontrol('Parent', panel, 'Style', 'edit', ...
+    'String', '', ...
+    'BackgroundColor', 'w', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [260 806 70 30]);
+
+lblPsdSource = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'PSD Source:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [15 775 70 22]);
+ddPsdSource = uicontrol('Parent', panel, 'Style', 'popupmenu', ...
+    'String', {'From Time Segment (periodogram)', 'VNA Native'}, ...
+    'Value', 1, ...
+    'BackgroundColor', 'w', ...
+    'Position', [90 772 240 24]);
+
 lblDataList = uicontrol('Parent', panel, 'Style', 'text', ...
     'String', 'Data List (File+Channel):', ...
     'HorizontalAlignment', 'left', ...
@@ -267,11 +297,25 @@ onResize();
 
         fileY = topY - 44;
         set(edtFile, 'Position', [xPad, fileY, pw - 2 * xPad, 30]);
+        listW = pw - 2 * xPad;
 
-        listLabelY = fileY - 54;
+        rangeY = fileY - 38;
+        tLabelW = 88;
+        tEditW = floor((listW - 2 * tLabelW - 15) / 2);
+        set(lblTStart, 'Position', [xPad, rangeY + 4, tLabelW, 22]);
+        set(edtTStart, 'Position', [xPad + tLabelW, rangeY, tEditW, 30]);
+        x2 = xPad + tLabelW + tEditW + 15;
+        set(lblTEnd, 'Position', [x2, rangeY + 4, tLabelW - 10, 22]);
+        set(edtTEnd, 'Position', [x2 + tLabelW - 10, rangeY, tEditW, 30]);
+
+        psdSrcY = rangeY - 34;
+        psdLabelW = 72;
+        set(lblPsdSource, 'Position', [xPad, psdSrcY + 2, psdLabelW, 22]);
+        set(ddPsdSource, 'Position', [xPad + psdLabelW + 4, psdSrcY, listW - psdLabelW - 4, 24]);
+
+        listLabelY = psdSrcY - 36;
         listH = max(110, min(240, ph - 500));
         listY = listLabelY - 6 - listH;
-        listW = pw - 2 * xPad;
 
         set(lstData, 'Position', [xPad, listY, listW, listH]);
         set(lblDataList, 'Position', [xPad, listLabelY, 180, 22]);
@@ -463,15 +507,23 @@ onResize();
             return;
         end
 
+        [timeWindow, rangeErr] = parseTimeRangeInputs(edtTStart, edtTEnd);
+        if ~isempty(rangeErr)
+            showAlertCompat(fig, rangeErr, 'Time Range Error');
+            return;
+        end
+
+        psdSourceMode = getPopupSelection(ddPsdSource);
+
         refInput = 1;
         keepExisting = logical(get(btnHold, 'Value'));
         if ~keepExisting
             cla(axMain1); cla(axMain2); cla(axMain3);
         end
 
-        renderOneAxis(axMain1, getPopupSelection(ddSel1), selectedSeries, app, refInput, keepExisting);
-        renderOneAxis(axMain2, getPopupSelection(ddSel2), selectedSeries, app, refInput, keepExisting);
-        renderOneAxis(axMain3, getPopupSelection(ddSel3), selectedSeries, app, refInput, keepExisting);
+        renderOneAxis(axMain1, getPopupSelection(ddSel1), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
+        renderOneAxis(axMain2, getPopupSelection(ddSel2), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
+        renderOneAxis(axMain3, getPopupSelection(ddSel3), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
         if keepExisting
             set(lblStatus, 'String', sprintf('Status: HOLD ON, appended %d entries', numel(selectedSeries)));
         else
@@ -578,7 +630,7 @@ onResize();
     end
 
     % 按 mode 在指定坐标轴上绘图（Time/PSD/Trans）
-    function usedRef = renderOneAxis(ax, mode, selectedSeries, app, refInput, keepExisting)
+    function usedRef = renderOneAxis(ax, mode, selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode)
         usedRef = NaN;
         styleAxisCompat(ax);
         switch mode
@@ -604,14 +656,21 @@ onResize();
                         logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), getNumericControlValue(edtOrder, 4));
                     yDraw = yDraw * getSeriesScale(app, S);
                     N = min(numel(F.t), numel(yDraw));
-                    safePlot(ax, F.t(1:N), yDraw(1:N), 'LineWidth', 1.1, ...
+                    if N < 2
+                        continue;
+                    end
+                    [tSeg, ySeg] = applyTimeWindow(F.t(1:N), yDraw(1:N), timeWindow);
+                    if numel(tSeg) < 2
+                        continue;
+                    end
+                    safePlot(ax, tSeg, ySeg, 'LineWidth', 1.1, ...
                         'Color', getSeriesColor(colorIdx), 'DisplayName', S.label);
                     anyTime = true;
                     colorIdx = colorIdx + 1;
-                    xMin = min(xMin, F.t(1));
-                    xMax = max(xMax, F.t(N));
-                    yMin = min(yMin, min(yDraw(1:N)));
-                    yMax = max(yMax, max(yDraw(1:N)));
+                    xMin = min(xMin, tSeg(1));
+                    xMax = max(xMax, tSeg(end));
+                    yMin = min(yMin, min(ySeg));
+                    yMax = max(yMax, max(ySeg));
                 end
                 hold(ax, 'off');
                 grid(ax, 'on');
@@ -639,12 +698,32 @@ onResize();
                 set(ax, 'XScale', 'log', 'YScale', 'log', 'YLimMode', 'auto');
                 hold(ax, 'on');
                 anyPsd = false;
+                usePeriodogramFromTime = isPeriodogramSource(psdSourceMode);
                 colorIdx = countLineLikeChildren(ax) + 1;
                 xMin = inf; xMax = -inf; yMin = inf; yMax = -inf;
                 for si = 1:numel(selectedSeries)
                     S = selectedSeries{si};
                     F = app.files{S.fileIdx};
-                    [f, psd] = getPsdForChannel(F, S.ch);
+                    if usePeriodogramFromTime
+                        yRaw = safeCellGet(F.rawByCh, S.ch);
+                        if isempty(yRaw)
+                            continue;
+                        end
+                        yProc = applyFilterToSignal( ...
+                            yRaw, F.fs, logical(get(chkLow, 'Value')), getNumericControlValue(edtLowCutoff, 100), ...
+                            logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), getNumericControlValue(edtOrder, 4));
+                        N = min(numel(F.t), numel(yProc));
+                        if N < 2
+                            continue;
+                        end
+                        [~, ySeg] = applyTimeWindow(F.t(1:N), yProc(1:N), timeWindow);
+                        if numel(ySeg) < 2
+                            continue;
+                        end
+                        [f, psd] = computePeriodogramPsd(ySeg, F.fs);
+                    else
+                        [f, psd] = getPsdForChannel(F, S.ch);
+                    end
                     if isempty(f)
                         continue;
                     end
@@ -660,7 +739,11 @@ onResize();
                 xlabel(ax, 'Frequency (Hz)');
                 ylabel(ax, '(m/s^2)^2/Hz');
                 if anyPsd
-                    title(ax, sprintf('PSD (log-log, %d entries)', numel(selectedSeries)));
+                    if usePeriodogramFromTime
+                        title(ax, sprintf('PSD (periodogram, log-log, %d entries)', numel(selectedSeries)));
+                    else
+                        title(ax, sprintf('PSD (VNA/native, log-log, %d entries)', numel(selectedSeries)));
+                    end
                     legend(ax, 'show', 'Location', 'northeast');
                     if ~keepExisting && isfinite(xMin) && isfinite(xMax) && xMax > xMin
                         xlim(ax, [xMin, xMax]);
@@ -751,9 +834,9 @@ onResize();
     function onClearPlots(~, ~)
         cla(axMain1); cla(axMain2); cla(axMain3);
         legend(axMain1, 'off'); legend(axMain2, 'off'); legend(axMain3, 'off');
-        renderOneAxis(axMain1, getPopupSelection(ddSel1), {}, getappdata(fig, 'app'), 1, false);
-        renderOneAxis(axMain2, getPopupSelection(ddSel2), {}, getappdata(fig, 'app'), 1, false);
-        renderOneAxis(axMain3, getPopupSelection(ddSel3), {}, getappdata(fig, 'app'), 1, false);
+        renderOneAxis(axMain1, getPopupSelection(ddSel1), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
+        renderOneAxis(axMain2, getPopupSelection(ddSel2), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
+        renderOneAxis(axMain3, getPopupSelection(ddSel3), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
         set(lblStatus, 'String', 'Status: plots cleared');
     end
 
@@ -1087,6 +1170,103 @@ trDb = 10 * log10(trLin);
 end
 
 % 解析通用数值矩阵文件（时间列/数据列）并推断采样率
+% Parse time range inputs. Empty value means open-ended boundary.
+function [timeWindow, errMsg] = parseTimeRangeInputs(edtStart, edtEnd)
+timeWindow = [NaN NaN];
+errMsg = '';
+
+startRaw = '';
+endRaw = '';
+try
+    startRaw = strtrim(get(edtStart, 'String'));
+catch
+end
+try
+    endRaw = strtrim(get(edtEnd, 'String'));
+catch
+end
+
+if ~isempty(startRaw)
+    t0 = str2double(startRaw);
+    if ~isfinite(t0)
+        errMsg = 'Time Start must be a valid number or empty.';
+        return;
+    end
+    timeWindow(1) = t0;
+end
+
+if ~isempty(endRaw)
+    t1 = str2double(endRaw);
+    if ~isfinite(t1)
+        errMsg = 'Time End must be a valid number or empty.';
+        return;
+    end
+    timeWindow(2) = t1;
+end
+
+if isfinite(timeWindow(1)) && isfinite(timeWindow(2)) && timeWindow(2) <= timeWindow(1)
+    errMsg = 'Time End must be greater than Time Start.';
+end
+end
+
+% Apply time window on aligned vectors.
+function [tOut, yOut] = applyTimeWindow(tIn, yIn, timeWindow)
+tOut = tIn(:);
+yOut = yIn(:);
+N = min(numel(tOut), numel(yOut));
+tOut = tOut(1:N);
+yOut = yOut(1:N);
+if isempty(tOut) || isempty(yOut)
+    return;
+end
+
+if nargin < 3 || isempty(timeWindow) || numel(timeWindow) < 2
+    return;
+end
+
+tStart = timeWindow(1);
+tEnd = timeWindow(2);
+mask = true(size(tOut));
+if isfinite(tStart)
+    mask = mask & (tOut >= tStart);
+end
+if isfinite(tEnd)
+    mask = mask & (tOut <= tEnd);
+end
+tOut = tOut(mask);
+yOut = yOut(mask);
+end
+
+% Compatible check for periodogram source mode (without using contains).
+function tf = isPeriodogramSource(psdSourceMode)
+tf = false;
+if ischar(psdSourceMode)
+    tf = ~isempty(strfind(lower(psdSourceMode), 'periodogram')); %#ok<STREMP>
+end
+end
+
+% Compute PSD with periodogram from time-domain segment.
+function [f, psd] = computePeriodogramPsd(y, fs)
+f = [];
+psd = [];
+y = y(:);
+y = y(isfinite(y));
+if numel(y) < 2 || ~isfinite(fs) || fs <= 0
+    return;
+end
+y = y - mean(y);
+
+try
+    [p0, f0] = periodogram(y, [], [], fs);
+catch
+    [f0, p0] = singleSideSpectrum(y, fs);
+end
+
+valid = isfinite(f0) & isfinite(p0) & (f0 > 0) & (p0 > 0);
+f = f0(valid);
+psd = p0(valid);
+end
+
 function [t, y, fs] = parseNumericMatrix(X, fsHint)
 if isempty(X) || ~isnumeric(X)
     error('File does not contain numeric data.');

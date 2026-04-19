@@ -1,7 +1,7 @@
 %% Load Data
-clc;close all ;clear all;
-strdir = '\\Li_nas\home\客户方\500\211911\地基测试\正常测试\S\';
-strfile = '2（WH右上角）.vna';
+% clc;close all ;clear all;
+strdir = 'F:\ai\test_data\diji\第一块\';
+strfile = 'stiffiness1.vna';
 % strfile = '003mid_sensor_mid_hanmmer.vna';
 load([strdir,strfile],'-mat');
 
@@ -23,17 +23,17 @@ coh = SLm.xcmeas(1,4).coh(2:end);
 
 % freq = SLm.fdxvec(2:end)'; % exclude the first frequency: 0 Hz
 % resp = SLm.xcmeas(1,3).xfer(2:end)*SLm.scmeas(3).eu_val/SLm.scmeas(1).eu_val;
-% coh = SLm.xcmeas(1,3).coh(2:end);
+coh = SLm.xcmeas(1,3).coh(2:end);
 
 h = figure;
-% subplot(212)
-% semilogx(freq,coh)
-% grid on
-% xlim([freq(1),freq(end)])
-% xlabel('Frequency [Hz]')
-% ylabel('Coherence')
+subplot(212)
+semilogx(freq,coh)
+grid on
+xlim([freq(1),freq(end)])
+xlabel('Frequency [Hz]')
+ylabel('Coherence')
 
-% subplot(211)
+subplot(211)
 % semilogx(freq,20*log10(abs(resp)))
 loglog(freq,abs(resp))
 % hold on

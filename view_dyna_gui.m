@@ -380,12 +380,20 @@ ylabel(axFoundVib, 'RMS Velocity [um/s]');
 set(axFoundVib, 'XScale', 'log', 'YScale', 'log');
 grid(axFoundVib, 'on');
 
-axFoundStiff = axes('Parent', tabFoundation, 'Units', 'pixels', 'Position', [20 65 1030 300], 'Box', 'on');
+axFoundStiff = axes('Parent', tabFoundation, 'Units', 'pixels', 'Position', [20 235 1030 215], 'Box', 'on');
 title(axFoundStiff, 'Dynamic Stiffness');
 xlabel(axFoundStiff, 'Frequency [Hz]');
 ylabel(axFoundStiff, 'Magnitude [N/m]');
 set(axFoundStiff, 'XScale', 'log', 'YScale', 'log');
 grid(axFoundStiff, 'on');
+
+axFoundCoh = axes('Parent', tabFoundation, 'Units', 'pixels', 'Position', [20 65 1030 145], 'Box', 'on');
+title(axFoundCoh, 'Coherence');
+xlabel(axFoundCoh, 'Frequency [Hz]');
+ylabel(axFoundCoh, 'Coherence');
+set(axFoundCoh, 'XScale', 'log', 'YScale', 'linear');
+ylim(axFoundCoh, [0 1]);
+grid(axFoundCoh, 'on');
 
 set(btnFig1, 'Callback', @(~, ~) onOpenAxisFigure(axMain1, 'Plot 1'));
 set(btnFig2, 'Callback', @(~, ~) onOpenAxisFigure(axMain2, 'Plot 2'));
@@ -718,16 +726,19 @@ onResize();
 
         fAxGap = 8;
         fAxTop = row3Y - 8;
-        fAxAvailH = max(220, fAxTop - fBottomPad);
-        fAxTopH = floor((fAxAvailH - fAxGap) / 2);
-        fAxBottomH = fAxAvailH - fAxGap - fAxTopH;
+        fAxAvailH = max(300, fAxTop - fBottomPad);
+        fAxBottomH = floor((fAxAvailH - 2 * fAxGap) / 3);
+        fAxMidH = fAxBottomH;
+        fAxTopH = fAxAvailH - 2 * fAxGap - fAxMidH - fAxBottomH;
         fAxX = fPadX;
         fAxW = max(360, tw - 2 * fPadX);
         fAxBottomY = fBottomPad;
-        fAxTopY = fAxBottomY + fAxBottomH + fAxGap;
+        fAxMidY = fAxBottomY + fAxBottomH + fAxGap;
+        fAxTopY = fAxMidY + fAxMidH + fAxGap;
 
         set(axFoundVib, 'OuterPosition', [fAxX, fAxTopY, fAxW, fAxTopH]);
-        set(axFoundStiff, 'OuterPosition', [fAxX, fAxBottomY, fAxW, fAxBottomH]);
+        set(axFoundStiff, 'OuterPosition', [fAxX, fAxMidY, fAxW, fAxMidH]);
+        set(axFoundCoh, 'OuterPosition', [fAxX, fAxBottomY, fAxW, fAxBottomH]);
     end
 
     % 加载数据文件（支持多选），并重建“数据项列表”
@@ -849,7 +860,7 @@ onResize();
         refreshFoundationFileSelectors();
 
         cla(axMain1); cla(axMain2); cla(axMain3);
-        cla(axFoundVib); cla(axFoundStiff);
+        cla(axFoundVib); cla(axFoundStiff); cla(axFoundCoh);
 
         if isempty(app.files)
             showAlertCompat(fig, 'No files were loaded successfully.', 'Load failed');
@@ -1251,9 +1262,9 @@ onResize();
     % 清空三幅图，并按当前图类型恢复空图状态
     function onClearPlots(~, ~)
         cla(axMain1); cla(axMain2); cla(axMain3);
-        cla(axFoundVib); cla(axFoundStiff);
+        cla(axFoundVib); cla(axFoundStiff); cla(axFoundCoh);
         legend(axMain1, 'off'); legend(axMain2, 'off'); legend(axMain3, 'off');
-        legend(axFoundVib, 'off'); legend(axFoundStiff, 'off');
+        legend(axFoundVib, 'off'); legend(axFoundStiff, 'off'); legend(axFoundCoh, 'off');
         renderOneAxis(axMain1, getPopupSelection(ddSel1), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
         renderOneAxis(axMain2, getPopupSelection(ddSel2), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
         renderOneAxis(axMain3, getPopupSelection(ddSel3), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
@@ -1317,7 +1328,7 @@ onResize();
         setappdata(fig, 'app', app);
         refreshLoadedFilesList();
         refreshFoundationFileSelectors();
-        cla(axFoundVib); cla(axFoundStiff);
+        cla(axFoundVib); cla(axFoundStiff); cla(axFoundCoh);
         set(lblStatus, 'String', sprintf('Status: deleted %d entries, remaining %d', removed, numel(app.series)));
     end
 
@@ -1456,6 +1467,7 @@ onResize();
         if ~keepExisting
             cla(axFoundVib);
             cla(axFoundStiff);
+            cla(axFoundCoh);
         end
 
         vcFlags = struct( ...
@@ -1486,8 +1498,16 @@ onResize();
             elseif ~isempty(msg)
                 msgParts{end + 1} = ['stiff skipped (' msg ')']; %#ok<AGROW>
             end
+
+            [ok, msg] = renderFoundationCoherenceAxis(axFoundCoh, Fstiff, exciteCh, respCh, keepExisting);
+            if ok
+                msgParts{end + 1} = sprintf('coh:%s', Fstiff.fileName); %#ok<AGROW>
+            elseif ~isempty(msg)
+                msgParts{end + 1} = ['coh skipped (' msg ')']; %#ok<AGROW>
+            end
         else
             msgParts{end + 1} = 'stiff file unavailable'; %#ok<AGROW>
+            msgParts{end + 1} = 'coh file unavailable'; %#ok<AGROW>
         end
 
         if isempty(msgParts)
@@ -1864,6 +1884,11 @@ if ~isfinite(rbw) || rbw <= 0
 end
 
 fAll = F.vna.freq(:);
+if numel(fAll) >= 2
+    fAll = fAll(2:end);
+else
+    fAll = [];
+end
 fAll = fAll(isfinite(fAll) & fAll > 0);
 if numel(fAll) < 2
     msg = 'not enough positive frequency points';
@@ -1899,12 +1924,12 @@ for i = 1:numel(vibChannels)
         continue;
     end
     M = min(numel(F.vna.freq), numel(aRaw));
-    if M < 2
+    if M < 3
         continue;
     end
-    f = F.vna.freq(1:M);
+    f = F.vna.freq(2:M);
     eu = safeGet(F.vna.eu, ch, 1);
-    aPsd = aRaw(1:M) * (eu ^ 2) / rbw;
+    aPsd = aRaw(2:M) * (eu ^ 2) / rbw;
     valid = isfinite(f) & isfinite(aPsd) & (f > 0) & (aPsd > 0);
     f = f(valid);
     aPsd = aPsd(valid);
@@ -2015,13 +2040,13 @@ end
 
 xfer = xc(exciteCh, respCh).xfer(:);
 M = min(numel(F.vna.freq), numel(xfer));
-if M < 2
+if M < 3
     msg = 'insufficient xfer points';
     title(ax, 'Dynamic Stiffness (insufficient points)');
     return;
 end
-f = F.vna.freq(1:M);
-x = xfer(1:M);
+f = F.vna.freq(2:M);
+x = xfer(2:M);
 euResp = safeGet(F.vna.eu, respCh, 1);
 euExc = safeGet(F.vna.eu, exciteCh, 1);
 resp = 1 ./ (x ./ ((2 * pi * f) .^ 2) * (euResp / euExc));
@@ -2061,6 +2086,74 @@ end
 ok = true;
 end
 
+function [ok, msg] = renderFoundationCoherenceAxis(ax, F, exciteCh, respCh, keepExisting)
+ok = false;
+msg = '';
+styleAxisCompat(ax);
+set(ax, 'XScale', 'log', 'YScale', 'linear', 'XLimMode', 'auto', 'YLimMode', 'auto');
+
+if ~isfield(F, 'vna') || ~isfield(F.vna, 'freq') || isempty(F.vna.freq)
+    msg = 'missing fdxvec';
+    title(ax, 'Coherence (missing fdxvec)');
+    return;
+end
+if ~isfield(F.vna, 'xcmeas') || isempty(F.vna.xcmeas)
+    msg = 'missing xcmeas';
+    title(ax, 'Coherence (missing xcmeas)');
+    return;
+end
+
+xc = F.vna.xcmeas;
+sz = size(xc);
+if numel(sz) < 2 || exciteCh < 1 || respCh < 1 || exciteCh > sz(1) || respCh > sz(2)
+    msg = sprintf('xcmeas index out of range (%d,%d)', exciteCh, respCh);
+    title(ax, 'Coherence (channel out of range)');
+    return;
+end
+if ~isstruct(xc(exciteCh, respCh)) || ~isfield(xc(exciteCh, respCh), 'coh') || isempty(xc(exciteCh, respCh).coh)
+    msg = 'missing xcmeas(...).coh';
+    title(ax, 'Coherence (missing coh)');
+    return;
+end
+
+coh = xc(exciteCh, respCh).coh(:);
+M = min(numel(F.vna.freq), numel(coh));
+if M < 3
+    msg = 'insufficient coherence points';
+    title(ax, 'Coherence (insufficient points)');
+    return;
+end
+f = F.vna.freq(2:M);
+c = coh(2:M);
+valid = isfinite(f) & isfinite(c) & (f > 0);
+f = f(valid);
+c = c(valid);
+if numel(f) < 2
+    msg = 'no valid coherence points';
+    title(ax, 'Coherence (no valid points)');
+    return;
+end
+
+hold(ax, 'on');
+safeSemilogx(ax, f, c, 'LineWidth', 1.2, ...
+    'Color', getSeriesColor(countLineLikeChildren(ax) + 1), ...
+    'DisplayName', sprintf('Coherence (%s, %d->%d)', F.fileName, exciteCh, respCh));
+hold(ax, 'off');
+
+grid(ax, 'on');
+xlabel(ax, 'Frequency [Hz]');
+ylabel(ax, 'Coherence');
+title(ax, sprintf('Coherence - %s', F.fileName));
+legend(ax, 'show', 'Location', 'northwest');
+ylim(ax, [0 1]);
+
+if ~keepExisting
+    xlim(ax, [f(1), f(end)]);
+end
+
+ok = true;
+end
+
 function [fc, fcL, fcU, errMsg] = getThirdOctaveBandsCompat(minF, maxF)
 fc = [];
 fcL = [];
@@ -2072,15 +2165,7 @@ if ~isfinite(minF) || ~isfinite(maxF) || minF <= 0 || maxF <= minF
     return;
 end
 
-try
-    if exist('nth_freq_band', 'file') == 2
-        [fc0, fcL0, fcU0] = nth_freq_band(3, minF, maxF);
-    else
-        [fc0, fcL0, fcU0] = fallbackThirdOctaveBands(minF, maxF);
-    end
-catch
-    [fc0, fcL0, fcU0] = fallbackThirdOctaveBands(minF, maxF);
-end
+[fc0, fcL0, fcU0] = computeNthFreqBandInternal(3, minF, maxF);
 
 fc0 = fc0(:);
 fcL0 = fcL0(:);
@@ -2113,19 +2198,91 @@ fcL = fcL0;
 fcU = fcU0;
 end
 
-function [fc, fcL, fcU] = fallbackThirdOctaveBands(minF, maxF)
-ratio = 2^(1 / 3);
-half = sqrt(ratio);
-kMin = floor(log(minF) / log(ratio)) - 1;
-kMax = ceil(log(maxF) / log(ratio)) + 1;
-k = (kMin:kMax)';
-fc = ratio .^ k;
-fcL = fc / half;
-fcU = fc * half;
-mask = (fcU >= minF) & (fcL <= maxF);
-fc = fc(mask);
-fcL = fcL(mask);
-fcU = fcU(mask);
+function [fc, fcL, fcU] = computeNthFreqBandInternal(N, minF, maxF)
+if nargin < 1 || ~isfinite(N) || N <= 0
+    N = 3;
+end
+if nargin < 2 || ~isfinite(minF) || minF <= 0
+    minF = 20;
+end
+if nargin < 3 || ~isfinite(maxF) || maxF <= minF
+    maxF = 20000;
+end
+
+N = round(N);
+Nmax = round(N * ceil(log(maxF / 1000) / log(2)) + 1);
+if Nmax < 1
+    Nmax = 1;
+end
+
+f_ab = zeros(Nmax + 1, 1);
+f_ab(1) = 1000;
+for n = 1:Nmax
+    f_ab(n + 1) = f_ab(n) * 10 ^ (3 / (10 * N));
+end
+f_ab = f_ab(f_ab < maxF * (2 ^ (0.5 / N)));
+
+Nmin = round(N * ceil(log(1000 / minF) / log(2)) + 1);
+if Nmin < 1
+    Nmin = 1;
+end
+
+f_bl = zeros(Nmin + 1, 1);
+f_bl(1) = 1000;
+for n = 1:Nmin
+    f_bl(n + 1) = f_bl(n) / (10 ^ (3 / (10 * N)));
+end
+f_bl = f_bl(f_bl > minF * (2 ^ (-0.5 / N)));
+
+fc = unique([f_bl; f_ab]);
+fc = fc(fc < maxF * (2 ^ (0.5 / N)));
+fc = fc(fc > minF * (2 ^ (-0.5 / N)));
+fcL = fc / (2 ^ (1 / (2 * N)));
+fcU = fc * (2 ^ (1 / (2 * N)));
+
+fc = applyAnsiPreferredAdjust(fc);
+fcL = sdRoundInternal(fcL, 3, 5);
+fcU = sdRoundInternal(fcU, 3, 5);
+end
+
+function out = applyAnsiPreferredAdjust(fc)
+fc5 = sdRoundInternal(fc, 3, 5);
+fc100 = sdRoundInternal(fc, 3, 100);
+out = fc5;
+mask = isfinite(fc5) & isfinite(fc100) & (fc100 ~= 0) & (abs(100 * (1 - fc5 ./ fc100)) < 1);
+out(mask) = fc100(mask);
+end
+
+function A2 = sdRoundInternal(A, Nsig, mult)
+if nargin < 2 || ~isfinite(Nsig)
+    Nsig = 3;
+end
+if nargin < 3 || ~isfinite(mult)
+    mult = 1;
+end
+Nsig = max(1, round(Nsig));
+mult = max(1, round(mult));
+
+A2 = A;
+if isempty(A)
+    return;
+end
+
+for i = 1:numel(A)
+    a = A(i);
+    if ~isfinite(a) || a == 0
+        A2(i) = a;
+        continue;
+    end
+
+    D = ceil(log10(abs(a)));
+    if abs(a) - 10 ^ D == 0
+        D = D + 1;
+    end
+    dec = 10 ^ (Nsig - D);
+    buf = dec / mult;
+    A2(i) = round(buf * a) / buf;
+end
 end
 
 function name = getFoundationVibLegendName(ch)

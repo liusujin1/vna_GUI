@@ -1,7 +1,7 @@
-clc;close all ;clear all;
+% clc;close all ;clear all;
 
-str_dir = 'D:\SynologyDrive\客户方\500\波米\波米\';
-str_file = 'P4.vna';
+str_dir = 'F:\ai\test_data\diji\第一块\';
+str_file = 'psd1.vna';
 load([str_dir,str_file],'-mat');
 
 f = SLm.fdxvec(2:end)';

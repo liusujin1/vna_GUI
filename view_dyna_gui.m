@@ -4,12 +4,14 @@ function view_dyna_gui()
 % - plot button drives time/PSD/transmissibility
 % - optional low-pass/high-pass filtering in time domain
 
+% 根据屏幕分辨率计算初始窗口尺寸（保留最小显示空间）
 screenSz = get(0, 'ScreenSize');
 figW = max(1220, min(round(screenSz(3) * 0.80), 1420));
 figH = max(760, min(round(screenSz(4) * 0.76), 820));
 figX = max(20, round((screenSz(3) - figW) / 2));
 figY = max(20, round((screenSz(4) - figH) / 2));
 
+% 创建主窗口，并关闭窗口编号显示
 fig = figure( ...
     'Name', 'Vibration Viewer', ...
     'NumberTitle', 'off', ...
@@ -18,10 +20,12 @@ fig = figure( ...
     'MenuBar', 'figure', ...
     'ToolBar', 'figure', ...
     'Resize', 'on');
+% 初始化应用状态（文件列表、数据项、滤波与自定义信息）
 app = initAppState();
 app.lastOpenDir = pwd;
 setappdata(fig, 'app', app);
 
+% 左侧控制面板：文件加载、数据列表、重命名与滤波参数
 panel = uipanel('Parent', fig, 'Title', 'Controls', 'Units', 'pixels', 'Position', [15 15 360 890]);
 
 btnLoad = uicontrol('Parent', panel, 'Style', 'pushbutton', ...
@@ -152,6 +156,7 @@ lblStatus = uicontrol('Parent', panel, 'Style', 'text', ...
     'HorizontalAlignment', 'left', ...
     'Position', [15 340 330 40]);
 
+% 右侧三幅图的类型选择与导出按钮
 lblSel1 = uicontrol('Parent', fig, 'Style', 'text', ...
     'String', 'Plot 1:', ...
     'HorizontalAlignment', 'left', ...
@@ -191,6 +196,7 @@ btnFig3 = uicontrol('Parent', fig, 'Style', 'pushbutton', ...
     'String', 'Figure', ...
     'Position', [556 366 62 26]);
 
+% 三个主绘图区：时域、PSD、传递率
 axMain1 = axes('Parent', fig, 'Units', 'pixels', 'Position', [390 645 1095 215], 'Box', 'on');
 title(axMain1, 'Time Domain');
 xlabel(axMain1, 'Time (s)');
@@ -211,13 +217,16 @@ ylabel(axMain3, 'dB');
 set(axMain3, 'XScale', 'log', 'YScale', 'linear');
 grid(axMain3, 'on');
 
+% 每幅图旁边的 Figure 按钮：导出当前图到单独窗口
 set(btnFig1, 'Callback', @(~, ~) onOpenAxisFigure(axMain1, 'Plot 1'));
 set(btnFig2, 'Callback', @(~, ~) onOpenAxisFigure(axMain2, 'Plot 2'));
 set(btnFig3, 'Callback', @(~, ~) onOpenAxisFigure(axMain3, 'Plot 3'));
 
+% 绑定窗口尺寸变化回调并执行一次初始布局
 set(fig, 'ResizeFcn', @onResize);
 onResize();
 
+    % 自适应布局：根据窗口尺寸重排左侧控件和右侧三幅图
     function onResize(~, ~)
         figPos = get(fig, 'Position');
         fw = figPos(3);
@@ -358,6 +367,7 @@ onResize();
         set(axMain3, 'OuterPosition', [axX, top3, axW, axH]);
     end
 
+    % 加载数据文件（支持多选），并重建“数据项列表”
     function onLoadFile(~, ~)
         app = getappdata(fig, 'app');
         startDir = app.lastOpenDir;
@@ -439,6 +449,7 @@ onResize();
         end
     end
 
+    % 主绘图入口：按所选数据项与图类型刷新三幅图
     function onPlot(~, ~)
         app = getappdata(fig, 'app');
         if ~app.loaded || isempty(app.files)
@@ -468,6 +479,7 @@ onResize();
         end
     end
 
+    % 将指定轴当前内容复制到单独 Figure，便于保存图片
     function onOpenAxisFigure(sourceAx, fallbackTitle)
         if countLineLikeChildren(sourceAx) == 0
             showAlertCompat(fig, 'Current plot is empty. Please plot data first.', 'Tip');
@@ -479,10 +491,12 @@ onResize();
         set(lblStatus, 'String', sprintf('Status: opened "%s" in a separate figure', figName));
     end
 
+    % 在重命名输入框按回车时触发重命名
     function onRenameEdited(~, ~)
         renameSelectedFromField(false);
     end
 
+    % 用输入框内容重命名当前选中数据项（支持提示控制）
     function renameSelectedFromField(showSelectionTips)
         app = getappdata(fig, 'app');
         selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
@@ -525,6 +539,7 @@ onResize();
         set(lblStatus, 'String', sprintf('Status: renamed "%s" to "%s"', S.label, renamedLabel));
     end
 
+    % 更新当前选中数据项的时域幅值缩放因子（Factor）
     function onScaleEdited(~, ~)
         app = getappdata(fig, 'app');
         selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
@@ -549,6 +564,7 @@ onResize();
         set(lblStatus, 'String', sprintf('Status: updated factor of "%s" to %g', S.label, scaleValue));
     end
 
+    % 列表选择变化时，同步刷新 Rename/Factor 输入框显示
     function onDataSelectionChanged(~, ~)
         app = getappdata(fig, 'app');
         selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
@@ -561,6 +577,7 @@ onResize();
         end
     end
 
+    % 按 mode 在指定坐标轴上绘图（Time/PSD/Trans）
     function usedRef = renderOneAxis(ax, mode, selectedSeries, app, refInput, keepExisting)
         usedRef = NaN;
         styleAxisCompat(ax);
@@ -714,6 +731,7 @@ onResize();
         end
     end
 
+    % Hold 开关：控制 Plot 时是追加还是覆盖
     function onHoldChanged(~, ~)
         if get(btnHold, 'Value')
             set(lblStatus, 'String', 'Status: Hold ON (next Plot will append)');
@@ -722,12 +740,14 @@ onResize();
         end
     end
 
+    % 重置滤波器开关（低通/高通关闭）
     function onResetFilter(~, ~)
         set(chkLow, 'Value', 0);
         set(chkHigh, 'Value', 0);
         set(lblStatus, 'String', 'Status: filter reset to None');
     end
 
+    % 清空三幅图，并按当前图类型恢复空图状态
     function onClearPlots(~, ~)
         cla(axMain1); cla(axMain2); cla(axMain3);
         legend(axMain1, 'off'); legend(axMain2, 'off'); legend(axMain3, 'off');
@@ -737,6 +757,7 @@ onResize();
         set(lblStatus, 'String', 'Status: plots cleared');
     end
 
+    % 删除选中的数据项（会从对应文件有效通道中移除）
     function onDeleteSelectedFiles(~, ~)
         app = getappdata(fig, 'app');
         if isempty(app.series)
@@ -795,6 +816,7 @@ onResize();
         set(lblStatus, 'String', sprintf('Status: deleted %d entries, remaining %d', removed, numel(app.series)));
     end
 
+    % 刷新左侧数据项列表，并尽量保留原选择
     function refreshLoadedFilesList(selectedLabels)
         if nargin < 1
             selectedLabels = {};
@@ -817,6 +839,7 @@ onResize();
     end
 end
 
+% 创建应用状态结构体（集中保存 UI 和数据处理状态）
 function app = initAppState()
 app.loaded = false;
 app.filePath = '';
@@ -840,6 +863,7 @@ app.vna = struct( ...
     'rbw', 1);
 end
 
+% 按文件扩展名读取数据并统一转成内部数据结构
 function D = readVibrationFile(fileName, fsHint)
 [~, ~, ext] = fileparts(fileName);
 ext = lower(ext);
@@ -863,6 +887,7 @@ switch ext
 end
 end
 
+% 解析 .vna/.mat 中的 SLm 结构，提取时域与频域数据
 function D = parseVnaLikeStruct(S, fsHint, D)
 slm = [];
 if isfield(S, 'SLm')
@@ -966,6 +991,7 @@ D.rawByCh = rawByCh;
 D.vna = vna;
 end
 
+% 对时域信号应用低通/高通滤波（支持单独或同时使用）
 function yDraw = applyFilterToSignal(yRaw, fs, useLow, lowCutoff, useHigh, highCutoff, order)
 yDraw = yRaw(:);
 if isempty(yDraw) || ~isfinite(fs) || fs <= 0
@@ -997,6 +1023,7 @@ catch
 end
 end
 
+% 获取某通道 PSD（优先使用文件内频谱，否则回退 FFT）
 function [f, psd] = getPsdForChannel(F, ch)
 f = [];
 psd = [];
@@ -1024,6 +1051,7 @@ f = f(valid);
 psd = psd(valid);
 end
 
+% 计算传递率（通道/参考通道）并转换为 dB
 function [f, trDb] = getTransRatio(F, ch, refCh)
 f = [];
 trDb = [];
@@ -1058,6 +1086,7 @@ trLin = num(valid) ./ den(valid);
 trDb = 10 * log10(trLin);
 end
 
+% 解析通用数值矩阵文件（时间列/数据列）并推断采样率
 function [t, y, fs] = parseNumericMatrix(X, fsHint)
 if isempty(X) || ~isnumeric(X)
     error('File does not contain numeric data.');
@@ -1093,6 +1122,7 @@ else
 end
 end
 
+% 获取工程单位换算系数 eu_val（缺省为 1）
 function eu = getEuVal(sc)
 if isfield(sc, 'eu_val') && ~isempty(sc.eu_val) && isfinite(sc.eu_val)
     eu = sc.eu_val;
@@ -1101,6 +1131,7 @@ else
 end
 end
 
+% 汇总所有已加载文件中的有效通道并去重
 function valid = collectValidChannels(files)
 valid = [];
 for i = 1:numel(files)
@@ -1116,6 +1147,7 @@ else
 end
 end
 
+% 生成顶部文件显示文本（少量文件显示名称，多文件显示摘要）
 function txt = summarizeLoadedFiles(files)
 n = numel(files);
 if n <= 3
@@ -1129,6 +1161,7 @@ else
 end
 end
 
+% 根据已加载文件重建“数据项列表”（文件+通道）
 function app = rebuildSeriesList(app)
 app = pruneCustomSeriesLabels(app);
 app = pruneCustomSeriesScales(app);
@@ -1158,6 +1191,7 @@ series = series(1:si);
 app.series = series;
 end
 
+% 清理已失效的自定义名称映射（文件被删后）
 function app = pruneCustomSeriesLabels(app)
 if isempty(app.customSeriesNames)
     return;
@@ -1174,6 +1208,7 @@ end
 app.customSeriesNames = app.customSeriesNames(keep);
 end
 
+% 清理已失效的自定义缩放映射（文件被删后）
 function app = pruneCustomSeriesScales(app)
 if isempty(app.customSeriesScales)
     return;
@@ -1190,6 +1225,7 @@ end
 app.customSeriesScales = app.customSeriesScales(keep);
 end
 
+% 获取数据项基础显示名（优先自定义名，否则文件名+通道）
 function label = getSeriesBaseLabel(app, F, ch)
 label = getCustomSeriesLabel(app, F.id, ch);
 if isempty(label)
@@ -1197,6 +1233,7 @@ if isempty(label)
 end
 end
 
+% 查询指定文件+通道的自定义显示名
 function label = getCustomSeriesLabel(app, fileId, ch)
 label = '';
 for i = 1:numel(app.customSeriesNames)
@@ -1208,6 +1245,7 @@ for i = 1:numel(app.customSeriesNames)
 end
 end
 
+% 设置/更新指定文件+通道的自定义显示名
 function app = setCustomSeriesLabel(app, fileId, ch, label)
 found = false;
 for i = 1:numel(app.customSeriesNames)
@@ -1223,6 +1261,7 @@ if ~found
 end
 end
 
+% 获取指定数据项的时域缩放因子（Factor）
 function scaleValue = getSeriesScale(app, S)
 fileId = getSeriesFileId(S, app);
 scaleValue = 1;
@@ -1238,6 +1277,7 @@ for i = 1:numel(app.customSeriesScales)
 end
 end
 
+% 设置/更新指定数据项的时域缩放因子（Factor）
 function app = setCustomSeriesScale(app, fileId, ch, scaleValue)
 found = false;
 for i = 1:numel(app.customSeriesScales)
@@ -1253,6 +1293,7 @@ if ~found
 end
 end
 
+% 根据 fileId+通道在当前 series 中查找实际显示名
 function label = findSeriesLabel(series, fileId, ch, fallback)
 label = fallback;
 for i = 1:numel(series)
@@ -1263,6 +1304,7 @@ for i = 1:numel(series)
 end
 end
 
+% 从 series 条目解析 fileId（兼容旧字段）
 function fileId = getSeriesFileId(S, app)
 if isfield(S, 'fileId') && ~isempty(S.fileId)
     fileId = S.fileId;
@@ -1279,6 +1321,7 @@ if isfield(S, 'fileIdx') && ~isempty(S.fileIdx)
 end
 end
 
+% 按显示名从 series 中筛选出已选数据项
 function selectedSeries = getSelectedSeries(series, selectedLabels)
 if isempty(series) || isempty(selectedLabels)
     selectedSeries = {};
@@ -1295,6 +1338,7 @@ for i = 1:numel(series)
 end
 end
 
+% 若目标通道无效，则选择最接近的有效通道
 function ch = chooseNearestValid(chIn, validList)
 if isempty(validList)
     ch = 1;
@@ -1308,6 +1352,7 @@ end
 ch = validList(i);
 end
 
+% 安全读取 cell 指定元素（越界返回空）
 function x = safeCellGet(c, idx)
 if idx >= 1 && idx <= numel(c)
     x = c{idx};
@@ -1316,6 +1361,7 @@ else
 end
 end
 
+% 安全读取数组指定元素（越界或无效返回默认值）
 function v = safeGet(arr, idx, fallback)
 if idx >= 1 && idx <= numel(arr) && isfinite(arr(idx))
     v = arr(idx);
@@ -1324,6 +1370,7 @@ else
 end
 end
 
+% 过滤无效点后执行线性 plot
 function safePlot(ax, x, y, varargin)
 valid = isfinite(x) & isfinite(y);
 x = x(valid);
@@ -1334,6 +1381,7 @@ end
 plot(ax, x, y, varargin{:});
 end
 
+% 过滤无效点后执行 semilogx
 function safeSemilogx(ax, x, y, varargin)
 valid = isfinite(x) & isfinite(y) & (x > 0);
 x = x(valid);
@@ -1344,6 +1392,7 @@ end
 semilogx(ax, x, y, varargin{:});
 end
 
+% 过滤无效点后执行 loglog
 function safeLoglog(ax, x, y, varargin)
 valid = isfinite(x) & isfinite(y) & (x > 0) & (y > 0);
 x = x(valid);
@@ -1354,6 +1403,7 @@ end
 loglog(ax, x, y, varargin{:});
 end
 
+% 统一曲线调色板（保证多曲线颜色可区分）
 function c = getSeriesColor(idx)
 palette = [ ...
     0.0000 0.4470 0.7410; ...
@@ -1371,6 +1421,7 @@ idx = mod(round(idx) - 1, size(palette, 1)) + 1;
 c = palette(idx, :);
 end
 
+% 统计坐标轴中 line 对象数量（用于颜色续接）
 function n = countLineLikeChildren(ax)
 n = 0;
 try
@@ -1386,6 +1437,7 @@ catch
 end
 end
 
+% 生成单独导出图窗标题（优先使用轴标题）
 function figName = getAxisExportTitle(ax, fallbackTitle)
 figName = fallbackTitle;
 try
@@ -1400,6 +1452,7 @@ catch
 end
 end
 
+% 复制当前轴内容到新 Figure（用于单图保存）
 function cloneAxisToFigure(sourceAx, figName)
 hFig = figure( ...
     'Name', figName, ...
@@ -1435,6 +1488,7 @@ end
 enableInteractiveFigureCompat(hFig);
 end
 
+% 按显示名恢复列表选中项（找不到则回退默认）
 function setListSelectionByLabels(h, items, selectedLabels)
 if isempty(items)
     set(h, 'Value', 1);
@@ -1461,6 +1515,7 @@ end
 set(h, 'Value', unique(idx, 'stable'));
 end
 
+% 判断向量是否像时间轴（单调递增且步长近似恒定）
 function tf = isTimeLike(v)
 v = v(:);
 if numel(v) < 3 || any(~isfinite(v))
@@ -1471,12 +1526,14 @@ d = diff(v);
 tf = all(d > 0) && (std(d) / max(mean(d), eps) < 1e-2);
 end
 
+% 校验采样率输入是否有效
 function validateFs(fs)
 if isempty(fs) || ~isfinite(fs) || fs <= 0
     error('Invalid Fs. Please input a valid sampling frequency.');
 end
 end
 
+% 计算单边幅值谱（FFT）
 function [f, amp] = singleSideSpectrum(y, fs)
 y = y(:);
 N = numel(y);
@@ -1491,6 +1548,7 @@ f = fs * (0:floor(N / 2))' / N;
 amp = P1(:);
 end
 
+% 从编辑框读取数值，失败时返回 fallback
 function v = getNumericControlValue(h, fallback)
 v = fallback;
 try
@@ -1506,6 +1564,7 @@ catch
 end
 end
 
+% 向编辑框写入数值文本
 function setNumericControlValue(h, v)
 try
     set(h, 'String', num2str(v));
@@ -1513,6 +1572,7 @@ catch
 end
 end
 
+% 获取下拉框当前选中的图类型字符串
 function mode = getPopupSelection(h)
 items = getCellStringCompat(get(h, 'String'));
 idx = get(h, 'Value');
@@ -1524,6 +1584,7 @@ idx = max(1, min(numel(items), idx));
 mode = items{idx};
 end
 
+% 获取列表当前选中项对应的字符串集合
 function labels = getSelectedListLabels(h)
 items = getCellStringCompat(get(h, 'String'));
 idx = get(h, 'Value');
@@ -1536,6 +1597,7 @@ labels = items(idx);
 labels = labels(~cellfun(@isempty, labels));
 end
 
+% 兼容 char/cell/string 的字符串列表转换
 function items = getCellStringCompat(raw)
 if isempty(raw)
     items = {};
@@ -1548,10 +1610,12 @@ else
 end
 end
 
+% 兼容目录存在性检查（适配老版本 MATLAB）
 function tf = isDirCompat(p)
 tf = ischar(p) && exist(p, 'dir') == 7;
 end
 
+% 统一弹窗提示（uialert 不可用时回退 errordlg）
 function showAlertCompat(figHandle, msg, ttl)
 try
     uialert(figHandle, msg, ttl);
@@ -1560,6 +1624,7 @@ catch
 end
 end
 
+% 兼容判断“是否为文本标量”
 function tf = isTextScalarCompat(v)
 tf = ischar(v);
 if tf
@@ -1572,6 +1637,7 @@ catch
 end
 end
 
+% 兼容读取数值矩阵（新版本 readmatrix，旧版本回退）
 function X = readMatrixCompat(fileName)
 if exist('readmatrix', 'file') == 2
     X = readmatrix(fileName);
@@ -1588,6 +1654,7 @@ switch ext
 end
 end
 
+% 设置图窗渲染器（优先 painters，提升导出稳定性）
 function setFigureRendererCompat(hFig)
 try
     set(hFig, 'Renderer', 'painters');
@@ -1595,6 +1662,7 @@ catch
 end
 end
 
+% 打开图窗交互能力（缩放、平移、数据光标）
 function enableInteractiveFigureCompat(hFig)
 try
     zoom(hFig, 'on');
@@ -1611,6 +1679,7 @@ catch
 end
 end
 
+% 统一坐标轴样式（边框、字体、边距）
 function styleAxisCompat(ax)
 try
     set(ax, 'Box', 'on', 'LineWidth', 1.0, 'FontSize', 10, ...

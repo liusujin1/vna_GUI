@@ -2064,8 +2064,12 @@ hold(ax, 'on');
 safeLoglog(ax, f, kAbs, 'LineWidth', 1.2, ...
     'Color', getSeriesColor(countLineLikeChildren(ax) + 1), ...
     'DisplayName', sprintf('Measurement (%s, %d->%d)', F.fileName, exciteCh, respCh));
-safeLoglog(ax, [f(1) f(end)], [1e8 1e8], '--', 'LineWidth', 1.5, ...
-    'Color', [0.85 0.20 0.20], 'DisplayName', 'Specification (10^8 N/m)');
+specF1 = max(30, f(1));
+specF2 = min(1000, f(end));
+if specF2 > specF1
+    safeLoglog(ax, [specF1 specF2], [1e8 1e8], '--', 'LineWidth', 1.5, ...
+        'Color', [0.85 0.20 0.20], 'DisplayName', 'Specification (10^8 N/m)');
+end
 hold(ax, 'off');
 
 grid(ax, 'on');

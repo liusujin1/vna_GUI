@@ -347,7 +347,7 @@ edtExciteCh = uicontrol('Parent', tabFoundation, 'Style', 'edit', ...
     'Position', [288 782 55 28]);
 
 lblRespCh = uicontrol('Parent', tabFoundation, 'Style', 'text', ...
-    'String', 'Resp Ch:', ...
+    'String', 'Resp Ch(s):', ...
     'HorizontalAlignment', 'left', ...
     'Position', [360 786 60 22]);
 edtRespCh = uicontrol('Parent', tabFoundation, 'Style', 'edit', ...
@@ -436,11 +436,18 @@ onResize();
         yCursor = ph - titleSafe;
 
         mainGroupVisible = ~isFoundationTabSelected(tabRight, tabFoundation);
+        plotGroupVisible = ~isFoundationTabSelected(tabRight, tabFoundation);
         if mainGroupVisible
             set(btnMainGroup, 'Visible', 'on');
         else
             set(btnMainGroup, 'Visible', 'off');
             set(grpMainProc, 'Visible', 'off');
+        end
+        if plotGroupVisible
+            set(btnPlotGroup, 'Visible', 'on');
+        else
+            set(btnPlotGroup, 'Visible', 'off');
+            set(grpPlot, 'Visible', 'off');
         end
 
         set(btnDataGroup, 'String', getGroupTitle('Data', isDataGroupExpanded), ...
@@ -450,7 +457,7 @@ onResize();
         set(btnPlotGroup, 'String', getGroupTitle('Plot', isPlotGroupExpanded), ...
             'Value', double(isPlotGroupExpanded));
 
-        visibleCount = 2 + double(mainGroupVisible);
+        visibleCount = 1 + double(mainGroupVisible) + double(plotGroupVisible);
         innerAvailH = max(260, ph - titleSafe - 8);
         bodyBudget = innerAvailH - visibleCount * headerH - (visibleCount + 1) * yGap;
         if bodyBudget < 0
@@ -466,7 +473,7 @@ onResize();
         if mainGroupVisible && isMainGroupExpanded
             mainH = 186;
         end
-        if isPlotGroupExpanded
+        if plotGroupVisible && isPlotGroupExpanded
             plotH = 120;
         end
         if isDataGroupExpanded
@@ -510,13 +517,15 @@ onResize();
             end
         end
 
-        % Plot group
-        set(btnPlotGroup, 'Position', [xPad, yCursor - headerH, bodyW, headerH]);
-        yCursor = yCursor - headerH;
-        if isPlotGroupExpanded
-            set(grpPlot, 'Visible', 'on', 'Position', [xPad, max(6, yCursor - plotH), bodyW, plotH]);
-        else
-            set(grpPlot, 'Visible', 'off', 'Position', [xPad, max(6, yCursor), bodyW, 1]);
+        % Plot group (shown only in Main tab)
+        if plotGroupVisible
+            set(btnPlotGroup, 'Position', [xPad, yCursor - headerH, bodyW, headerH]);
+            yCursor = yCursor - headerH;
+            if isPlotGroupExpanded
+                set(grpPlot, 'Visible', 'on', 'Position', [xPad, max(6, yCursor - plotH), bodyW, plotH]);
+            else
+                set(grpPlot, 'Visible', 'off', 'Position', [xPad, max(6, yCursor), bodyW, 1]);
+            end
         end
 
         % Layout inside Data group
@@ -615,7 +624,7 @@ onResize();
         end
 
         % Layout inside Plot group
-        if isPlotGroupExpanded
+        if plotGroupVisible && isPlotGroupExpanded
             gw = bodyW;
             gh = plotH;
             gx = 10;
@@ -698,7 +707,7 @@ onResize();
         cfgGap = 6;
         vibLblW = 46; vibEditW = 88;
         exLblW = 60; exEditW = 46;
-        rpLblW = 54; rpEditW = 46;
+        rpLblW = 68; rpEditW = 72;
         x0 = fPadX;
         set(lblVibCh, 'Position', [x0, row2Y + 2, vibLblW, 22]);
         x0 = x0 + vibLblW + 2;
@@ -1448,7 +1457,7 @@ onResize();
             return;
         end
 
-        [vibChannels, vibErr] = parseChannelListString(get(edtVibCh, 'String'));
+        [vibChannels, vibErr] = parseChannelListStringNamed(get(edtVibCh, 'String'), 'Vib Ch');
         if ~isempty(vibErr)
             showAlertCompat(fig, vibErr, 'Foundation Setting Error');
             return;
@@ -1458,7 +1467,7 @@ onResize();
             showAlertCompat(fig, exciteErr, 'Foundation Setting Error');
             return;
         end
-        [respCh, respErr] = parsePositiveIntString(get(edtRespCh, 'String'), 'Resp Ch');
+        [respChannels, respErr] = parseChannelListStringNamed(get(edtRespCh, 'String'), 'Resp Ch(s)');
         if ~isempty(respErr)
             showAlertCompat(fig, respErr, 'Foundation Setting Error');
             return;
@@ -1492,16 +1501,24 @@ onResize();
         end
 
         if okStiff
-            [ok, msg] = renderFoundationStiffnessAxis(axFoundStiff, Fstiff, exciteCh, respCh, keepExisting);
+            [ok, msg] = renderFoundationStiffnessAxis(axFoundStiff, Fstiff, exciteCh, respChannels, keepExisting);
             if ok
-                msgParts{end + 1} = sprintf('stiff:%s', Fstiff.fileName); %#ok<AGROW>
+                if isempty(msg)
+                    msgParts{end + 1} = sprintf('stiff:%s', Fstiff.fileName); %#ok<AGROW>
+                else
+                    msgParts{end + 1} = sprintf('stiff:%s (%s)', Fstiff.fileName, msg); %#ok<AGROW>
+                end
             elseif ~isempty(msg)
                 msgParts{end + 1} = ['stiff skipped (' msg ')']; %#ok<AGROW>
             end
 
-            [ok, msg] = renderFoundationCoherenceAxis(axFoundCoh, Fstiff, exciteCh, respCh, keepExisting);
+            [ok, msg] = renderFoundationCoherenceAxis(axFoundCoh, Fstiff, exciteCh, respChannels, keepExisting);
             if ok
-                msgParts{end + 1} = sprintf('coh:%s', Fstiff.fileName); %#ok<AGROW>
+                if isempty(msg)
+                    msgParts{end + 1} = sprintf('coh:%s', Fstiff.fileName); %#ok<AGROW>
+                else
+                    msgParts{end + 1} = sprintf('coh:%s (%s)', Fstiff.fileName, msg); %#ok<AGROW>
+                end
             elseif ~isempty(msg)
                 msgParts{end + 1} = ['coh skipped (' msg ')']; %#ok<AGROW>
             end
@@ -1838,6 +1855,18 @@ end
 channels = unique(vals, 'stable');
 end
 
+function [channels, errMsg] = parseChannelListStringNamed(raw, fieldName)
+[channels, errMsg] = parseChannelListString(raw);
+if nargin < 2 || isempty(fieldName) || isempty(errMsg)
+    return;
+end
+if ~ischar(fieldName)
+    return;
+end
+errMsg = strrep(errMsg, 'Vib Ch', fieldName);
+errMsg = strrep(errMsg, 'channel token', [fieldName ' token']);
+end
+
 function [value, errMsg] = parsePositiveIntString(raw, fieldName)
 value = NaN;
 errMsg = '';
@@ -2008,7 +2037,7 @@ else
 end
 end
 
-function [ok, msg] = renderFoundationStiffnessAxis(ax, F, exciteCh, respCh, keepExisting)
+function [ok, msg] = renderFoundationStiffnessAxis(ax, F, exciteCh, respChannels, keepExisting)
 ok = false;
 msg = '';
 styleAxisCompat(ax);
@@ -2027,48 +2056,72 @@ end
 
 xc = F.vna.xcmeas;
 sz = size(xc);
-if numel(sz) < 2 || exciteCh < 1 || respCh < 1 || exciteCh > sz(1) || respCh > sz(2)
-    msg = sprintf('xcmeas index out of range (%d,%d)', exciteCh, respCh);
-    title(ax, 'Dynamic Stiffness (channel out of range)');
+if numel(sz) < 2 || exciteCh < 1 || exciteCh > sz(1)
+    msg = sprintf('xcmeas excite index out of range (%d)', exciteCh);
+    title(ax, 'Dynamic Stiffness (excite channel out of range)');
     return;
 end
-if ~isstruct(xc(exciteCh, respCh)) || ~isfield(xc(exciteCh, respCh), 'xfer') || isempty(xc(exciteCh, respCh).xfer)
-    msg = 'missing xcmeas(...).xfer';
-    title(ax, 'Dynamic Stiffness (missing xfer)');
-    return;
-end
-
-xfer = xc(exciteCh, respCh).xfer(:);
-M = min(numel(F.vna.freq), numel(xfer));
-if M < 3
-    msg = 'insufficient xfer points';
-    title(ax, 'Dynamic Stiffness (insufficient points)');
-    return;
-end
-f = F.vna.freq(2:M);
-x = xfer(2:M);
-euResp = safeGet(F.vna.eu, respCh, 1);
-euExc = safeGet(F.vna.eu, exciteCh, 1);
-resp = 1 ./ (x ./ ((2 * pi * f) .^ 2) * (euResp / euExc));
-kAbs = abs(resp);
-valid = isfinite(f) & isfinite(kAbs) & (f > 0) & (kAbs > 0);
-f = f(valid);
-kAbs = kAbs(valid);
-if numel(f) < 2
-    msg = 'no valid stiffness points';
-    title(ax, 'Dynamic Stiffness (no valid points)');
+if isempty(respChannels)
+    msg = 'Resp Ch(s) is empty';
+    title(ax, 'Dynamic Stiffness (empty response channels)');
     return;
 end
 
 hold(ax, 'on');
-safeLoglog(ax, f, kAbs, 'LineWidth', 1.2, ...
-    'Color', getSeriesColor(countLineLikeChildren(ax) + 1), ...
-    'DisplayName', sprintf('Measurement (%s, %d->%d)', F.fileName, exciteCh, respCh));
-specF1 = max(30, f(1));
-specF2 = min(1000, f(end));
-if specF2 > specF1
-    safeLoglog(ax, [specF1 specF2], [1e8 1e8], '--', 'LineWidth', 1.5, ...
-        'Color', [0.85 0.20 0.20], 'DisplayName', 'Specification (10^8 N/m)');
+euExc = safeGet(F.vna.eu, exciteCh, 1);
+xMin = inf;
+xMax = -inf;
+yMin = inf;
+yMax = -inf;
+plottedCount = 0;
+skippedResp = [];
+for i = 1:numel(respChannels)
+    respCh = respChannels(i);
+    if respCh < 1 || respCh > sz(2)
+        skippedResp(end + 1) = respCh; %#ok<AGROW>
+        continue;
+    end
+    if ~isstruct(xc(exciteCh, respCh)) || ~isfield(xc(exciteCh, respCh), 'xfer') || isempty(xc(exciteCh, respCh).xfer)
+        skippedResp(end + 1) = respCh; %#ok<AGROW>
+        continue;
+    end
+
+    xfer = xc(exciteCh, respCh).xfer(:);
+    M = min(numel(F.vna.freq), numel(xfer));
+    if M < 3
+        skippedResp(end + 1) = respCh; %#ok<AGROW>
+        continue;
+    end
+    f = F.vna.freq(2:M);
+    x = xfer(2:M);
+    euResp = safeGet(F.vna.eu, respCh, 1);
+    resp = 1 ./ (x ./ ((2 * pi * f) .^ 2) * (euResp / euExc));
+    kAbs = abs(resp);
+    valid = isfinite(f) & isfinite(kAbs) & (f > 0) & (kAbs > 0);
+    f = f(valid);
+    kAbs = kAbs(valid);
+    if numel(f) < 2
+        skippedResp(end + 1) = respCh; %#ok<AGROW>
+        continue;
+    end
+
+    safeLoglog(ax, f, kAbs, 'LineWidth', 1.2, ...
+        'Color', getSeriesColor(countLineLikeChildren(ax) + 1), ...
+        'DisplayName', getFoundationVibLegendName(respCh));
+    plottedCount = plottedCount + 1;
+    xMin = min(xMin, f(1));
+    xMax = max(xMax, f(end));
+    yMin = min(yMin, min(kAbs));
+    yMax = max(yMax, max(kAbs));
+end
+
+if plottedCount > 0
+    specF1 = max(30, xMin);
+    specF2 = min(1000, xMax);
+    if specF2 > specF1
+        safeLoglog(ax, [specF1 specF2], [1e8 1e8], '--', 'LineWidth', 1.5, ...
+            'Color', [0.85 0.20 0.20], 'DisplayName', 'Specification (10^8 N/m)');
+    end
 end
 hold(ax, 'off');
 
@@ -2076,21 +2129,36 @@ grid(ax, 'on');
 xlabel(ax, 'Frequency [Hz]');
 ylabel(ax, 'Magnitude [N/m]');
 title(ax, sprintf('Dynamic Stiffness - %s', F.fileName));
-legend(ax, 'show', 'Location', 'northwest');
+if plottedCount > 0
+    legend(ax, 'show', 'Location', 'northwest');
+else
+    legend(ax, 'off');
+end
+
+if plottedCount == 0
+    title(ax, 'Dynamic Stiffness (no valid points)');
+    if isempty(skippedResp)
+        msg = 'no valid stiffness points';
+    else
+        msg = ['no valid stiffness points for Resp Ch(s): ' formatChannelList(skippedResp)];
+    end
+    return;
+end
 
 if ~keepExisting
-    xlim(ax, [f(1), f(end)]);
-    yMin = min(kAbs);
-    yMax = max(kAbs);
+    xlim(ax, [xMin, xMax]);
     if isfinite(yMin) && isfinite(yMax) && yMax > yMin
         ylim(ax, [yMin, yMax]);
     end
 end
 
+if ~isempty(skippedResp)
+    msg = ['skipped Resp Ch(s): ' formatChannelList(skippedResp)];
+end
 ok = true;
 end
 
-function [ok, msg] = renderFoundationCoherenceAxis(ax, F, exciteCh, respCh, keepExisting)
+function [ok, msg] = renderFoundationCoherenceAxis(ax, F, exciteCh, respChannels, keepExisting)
 ok = false;
 msg = '';
 styleAxisCompat(ax);
@@ -2109,50 +2177,85 @@ end
 
 xc = F.vna.xcmeas;
 sz = size(xc);
-if numel(sz) < 2 || exciteCh < 1 || respCh < 1 || exciteCh > sz(1) || respCh > sz(2)
-    msg = sprintf('xcmeas index out of range (%d,%d)', exciteCh, respCh);
-    title(ax, 'Coherence (channel out of range)');
+if numel(sz) < 2 || exciteCh < 1 || exciteCh > sz(1)
+    msg = sprintf('xcmeas excite index out of range (%d)', exciteCh);
+    title(ax, 'Coherence (excite channel out of range)');
     return;
 end
-if ~isstruct(xc(exciteCh, respCh)) || ~isfield(xc(exciteCh, respCh), 'coh') || isempty(xc(exciteCh, respCh).coh)
-    msg = 'missing xcmeas(...).coh';
-    title(ax, 'Coherence (missing coh)');
-    return;
-end
-
-coh = xc(exciteCh, respCh).coh(:);
-M = min(numel(F.vna.freq), numel(coh));
-if M < 3
-    msg = 'insufficient coherence points';
-    title(ax, 'Coherence (insufficient points)');
-    return;
-end
-f = F.vna.freq(2:M);
-c = coh(2:M);
-valid = isfinite(f) & isfinite(c) & (f > 0);
-f = f(valid);
-c = c(valid);
-if numel(f) < 2
-    msg = 'no valid coherence points';
-    title(ax, 'Coherence (no valid points)');
+if isempty(respChannels)
+    msg = 'Resp Ch(s) is empty';
+    title(ax, 'Coherence (empty response channels)');
     return;
 end
 
 hold(ax, 'on');
-safeSemilogx(ax, f, c, 'LineWidth', 1.2, ...
-    'Color', getSeriesColor(countLineLikeChildren(ax) + 1), ...
-    'DisplayName', sprintf('Coherence (%s, %d->%d)', F.fileName, exciteCh, respCh));
+xMin = inf;
+xMax = -inf;
+plottedCount = 0;
+skippedResp = [];
+for i = 1:numel(respChannels)
+    respCh = respChannels(i);
+    if respCh < 1 || respCh > sz(2)
+        skippedResp(end + 1) = respCh; %#ok<AGROW>
+        continue;
+    end
+    if ~isstruct(xc(exciteCh, respCh)) || ~isfield(xc(exciteCh, respCh), 'coh') || isempty(xc(exciteCh, respCh).coh)
+        skippedResp(end + 1) = respCh; %#ok<AGROW>
+        continue;
+    end
+
+    coh = xc(exciteCh, respCh).coh(:);
+    M = min(numel(F.vna.freq), numel(coh));
+    if M < 3
+        skippedResp(end + 1) = respCh; %#ok<AGROW>
+        continue;
+    end
+    f = F.vna.freq(2:M);
+    c = coh(2:M);
+    valid = isfinite(f) & isfinite(c) & (f > 0);
+    f = f(valid);
+    c = c(valid);
+    if numel(f) < 2
+        skippedResp(end + 1) = respCh; %#ok<AGROW>
+        continue;
+    end
+
+    safeSemilogx(ax, f, c, 'LineWidth', 1.2, ...
+        'Color', getSeriesColor(countLineLikeChildren(ax) + 1), ...
+        'DisplayName', getFoundationVibLegendName(respCh));
+    plottedCount = plottedCount + 1;
+    xMin = min(xMin, f(1));
+    xMax = max(xMax, f(end));
+end
 hold(ax, 'off');
 
 grid(ax, 'on');
 xlabel(ax, 'Frequency [Hz]');
 ylabel(ax, 'Coherence');
 title(ax, sprintf('Coherence - %s', F.fileName));
-legend(ax, 'show', 'Location', 'northwest');
+if plottedCount > 0
+    legend(ax, 'show', 'Location', 'northwest');
+else
+    legend(ax, 'off');
+end
 ylim(ax, [0 1]);
 
+if plottedCount == 0
+    title(ax, 'Coherence (no valid points)');
+    if isempty(skippedResp)
+        msg = 'no valid coherence points';
+    else
+        msg = ['no valid coherence points for Resp Ch(s): ' formatChannelList(skippedResp)];
+    end
+    return;
+end
+
 if ~keepExisting
-    xlim(ax, [f(1), f(end)]);
+    xlim(ax, [xMin, xMax]);
+end
+
+if ~isempty(skippedResp)
+    msg = ['skipped Resp Ch(s): ' formatChannelList(skippedResp)];
 end
 
 ok = true;
@@ -2286,6 +2389,18 @@ for i = 1:numel(A)
     dec = 10 ^ (Nsig - D);
     buf = dec / mult;
     A2(i) = round(buf * a) / buf;
+end
+end
+
+function txt = formatChannelList(chList)
+if isempty(chList)
+    txt = '';
+    return;
+end
+chList = unique(chList(:)', 'stable');
+txt = num2str(chList(1));
+for i = 2:numel(chList)
+    txt = [txt ',' num2str(chList(i))]; %#ok<AGROW>
 end
 end
 

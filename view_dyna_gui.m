@@ -79,7 +79,7 @@ lblPsdSource = uicontrol('Parent', panel, 'Style', 'text', ...
     'Position', [15 775 70 22]);
 ddPsdSource = uicontrol('Parent', panel, 'Style', 'popupmenu', ...
     'String', {'From Time Segment (periodogram)', 'VNA Native'}, ...
-    'Value', 1, ...
+    'Value', 2, ...
     'BackgroundColor', 'w', ...
     'Position', [90 772 240 24]);
 
@@ -244,7 +244,7 @@ lblSel1 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'HorizontalAlignment', 'left', ...
     'Position', [390 870 45 22]);
 ddSel1 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
-    'String', {'Time', 'PSD', 'Trans'}, ...
+    'String', {'Time', 'PSD', 'Trans', 'Coherence'}, ...
     'Value', 1, ...
     'BackgroundColor', 'w', ...
     'Position', [440 868 110 24]);
@@ -257,7 +257,7 @@ lblSel2 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'HorizontalAlignment', 'left', ...
     'Position', [390 620 45 22]);
 ddSel2 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
-    'String', {'Time', 'PSD', 'Trans'}, ...
+    'String', {'Time', 'PSD', 'Trans', 'Coherence'}, ...
     'Value', 2, ...
     'BackgroundColor', 'w', ...
     'Position', [440 618 110 24]);
@@ -270,7 +270,7 @@ lblSel3 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'HorizontalAlignment', 'left', ...
     'Position', [390 370 45 22]);
 ddSel3 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
-    'String', {'Time', 'PSD', 'Trans'}, ...
+    'String', {'Time', 'PSD', 'Trans', 'Coherence'}, ...
     'Value', 3, ...
     'BackgroundColor', 'w', ...
     'Position', [440 368 110 24]);
@@ -339,15 +339,18 @@ edtVibCh = uicontrol('Parent', tabFoundation, 'Style', 'edit', ...
 lblExciteCh = uicontrol('Parent', tabFoundation, 'Style', 'text', ...
     'String', 'Excite Ch:', ...
     'HorizontalAlignment', 'left', ...
-    'Position', [220 786 66 22]);
+    'Position', [220 786 66 22], ...
+    'Visible', 'off');
 edtExciteCh = uicontrol('Parent', tabFoundation, 'Style', 'edit', ...
     'String', '1', ...
     'BackgroundColor', 'w', ...
     'HorizontalAlignment', 'left', ...
-    'Position', [288 782 55 28]);
+    'Position', [288 782 55 28], ...
+    'Visible', 'off', ...
+    'Enable', 'off');
 
 lblRespCh = uicontrol('Parent', tabFoundation, 'Style', 'text', ...
-    'String', 'Resp Ch(s):', ...
+    'String', 'Stiff Ch:', ...
     'HorizontalAlignment', 'left', ...
     'Position', [360 786 60 22]);
 edtRespCh = uicontrol('Parent', tabFoundation, 'Style', 'edit', ...
@@ -706,17 +709,14 @@ onResize();
         row2Y = fTopY - 34;
         cfgGap = 6;
         vibLblW = 46; vibEditW = 88;
-        exLblW = 60; exEditW = 46;
-        rpLblW = 68; rpEditW = 72;
+        rpLblW = 56; rpEditW = 80;
         x0 = fPadX;
         set(lblVibCh, 'Position', [x0, row2Y + 2, vibLblW, 22]);
         x0 = x0 + vibLblW + 2;
         set(edtVibCh, 'Position', [x0, row2Y, vibEditW, 28]);
         x0 = x0 + vibEditW + cfgGap;
-        set(lblExciteCh, 'Position', [x0, row2Y + 2, exLblW, 22]);
-        x0 = x0 + exLblW + 2;
-        set(edtExciteCh, 'Position', [x0, row2Y, exEditW, 28]);
-        x0 = x0 + exEditW + cfgGap;
+        set(lblExciteCh, 'Visible', 'off');
+        set(edtExciteCh, 'Visible', 'off');
         set(lblRespCh, 'Position', [x0, row2Y + 2, rpLblW, 22]);
         x0 = x0 + rpLblW + 2;
         set(edtRespCh, 'Position', [x0, row2Y, rpEditW, 28]);
@@ -843,7 +843,7 @@ onResize();
             try
                 D = readVibrationFile(fullName, getNumericControlValue(edtFs, 1000));
                 D.filePath = fullName;
-                D.fileName = oneFile;
+                D.fileName = getSeriesDisplayFileName(oneFile);
                 D.id = app.nextFileId;
                 app.nextFileId = app.nextFileId + 1;
                 app.files{end + 1} = D;
@@ -1198,7 +1198,7 @@ onResize();
                     legend(ax, 'off');
                 end
 
-            otherwise % 'Trans'
+            case 'Trans'
                 set(ax, 'XScale', 'log', 'YScale', 'linear', 'YLimMode', 'auto');
                 hold(ax, 'on');
                 anyTr = false;
@@ -1233,7 +1233,7 @@ onResize();
                 xlabel(ax, 'Frequency (Hz)');
                 ylabel(ax, 'dB');
                 if anyTr
-                    title(ax, sprintf('Transmissibility (dB, ref~ch%d)', usedRef));
+                    title(ax, 'Transmissibility (dB)');
                     legend(ax, 'show', 'Location', 'northeast');
                     if ~keepExisting && isfinite(xMin) && isfinite(xMax) && xMax > xMin
                         xlim(ax, [xMin, xMax]);
@@ -1246,9 +1246,63 @@ onResize();
                         end
                     end
                 else
-                    title(ax, sprintf('Transmissibility (no valid data, ref~ch%d)', refInput));
+                    title(ax, 'Transmissibility (no valid data)');
                     legend(ax, 'off');
                 end
+
+            case 'Coherence'
+                set(ax, 'XScale', 'log', 'YScale', 'linear', 'YLimMode', 'auto');
+                hold(ax, 'on');
+                anyCoh = false;
+                colorIdx = countLineLikeChildren(ax) + 1;
+                xMin = inf; xMax = -inf;
+                usedRef = refInput;
+                for si = 1:numel(selectedSeries)
+                    S = selectedSeries{si};
+                    F = app.files{S.fileIdx};
+                    if ~F.vna.available
+                        continue;
+                    end
+                    refCh = chooseNearestValid(refInput, F.validChannels);
+                    usedRef = refCh;
+                    if S.ch == refCh || ~ismember(S.ch, F.validChannels)
+                        continue;
+                    end
+                    [f, coh] = getCoherenceRatio(F, S.ch, refCh);
+                    if isempty(f)
+                        continue;
+                    end
+                    safeSemilogx(ax, f, coh, 'LineWidth', 1.1, ...
+                        'Color', getSeriesColor(colorIdx), ...
+                        'DisplayName', S.label);
+                    anyCoh = true;
+                    colorIdx = colorIdx + 1;
+                    xMin = min(xMin, f(1)); xMax = max(xMax, f(end));
+                end
+                hold(ax, 'off');
+                grid(ax, 'on');
+                xlabel(ax, 'Frequency (Hz)');
+                ylabel(ax, 'Coherence');
+                if anyCoh
+                    title(ax, sprintf('Coherence (%d entries)', numel(selectedSeries)));
+                    legend(ax, 'show', 'Location', 'northeast');
+                    if ~keepExisting && isfinite(xMin) && isfinite(xMax) && xMax > xMin
+                        xlim(ax, [xMin, xMax]);
+                    end
+                    if ~keepExisting
+                        ylim(ax, [0, 1]);
+                    end
+                else
+                    title(ax, 'Coherence (no valid data)');
+                    legend(ax, 'off');
+                    if ~keepExisting
+                        ylim(ax, [0, 1]);
+                    end
+                end
+
+            otherwise
+                title(ax, 'Unknown mode');
+                legend(ax, 'off');
         end
     end
 
@@ -1396,7 +1450,7 @@ onResize();
         for i = 1:n
             F = app.files{i};
             ids(i + 1) = F.id;
-            items{i + 1} = sprintf('%s [id:%d]', F.fileName, F.id);
+            items{i + 1} = sprintf('%s [id:%d]', getSeriesDisplayFileName(F.fileName), F.id);
         end
 
         vibIdx = find(ids == preferredVibId, 1, 'first');
@@ -1462,12 +1516,8 @@ onResize();
             showAlertCompat(fig, vibErr, 'Foundation Setting Error');
             return;
         end
-        [exciteCh, exciteErr] = parsePositiveIntString(get(edtExciteCh, 'String'), 'Excite Ch');
-        if ~isempty(exciteErr)
-            showAlertCompat(fig, exciteErr, 'Foundation Setting Error');
-            return;
-        end
-        [respChannels, respErr] = parseChannelListStringNamed(get(edtRespCh, 'String'), 'Resp Ch(s)');
+        exciteCh = 1;
+        [respChannels, respErr] = parseChannelListStringNamed(get(edtRespCh, 'String'), 'Stiff Ch');
         if ~isempty(respErr)
             showAlertCompat(fig, respErr, 'Foundation Setting Error');
             return;
@@ -1787,6 +1837,40 @@ trLin = num(valid) ./ den(valid);
 trDb = 10 * log10(trLin);
 end
 
+function [f, coh] = getCoherenceRatio(F, ch, refCh)
+f = [];
+coh = [];
+if ~F.vna.available
+    return;
+end
+if ch < 1 || ch > F.vna.nCh || refCh < 1 || refCh > F.vna.nCh
+    return;
+end
+if ~isfield(F.vna, 'xcmeas') || isempty(F.vna.xcmeas)
+    return;
+end
+
+xc = F.vna.xcmeas;
+sz = size(xc);
+if numel(sz) < 2 || refCh > sz(1) || ch > sz(2)
+    return;
+end
+if ~isstruct(xc(refCh, ch)) || ~isfield(xc(refCh, ch), 'coh') || isempty(xc(refCh, ch).coh)
+    return;
+end
+
+c0 = xc(refCh, ch).coh(:);
+M = min(numel(F.vna.freq), numel(c0));
+if M < 3
+    return;
+end
+f0 = F.vna.freq(2:M);
+c0 = c0(2:M);
+valid = isfinite(f0) & isfinite(c0) & (f0 > 0);
+f = f0(valid);
+coh = c0(valid);
+end
+
 % 解析通用数值矩阵文件（时间列/数据列）并推断采样率
 % Parse time range inputs. Empty value means open-ended boundary.
 function [F, ok] = getFileById(files, fileId)
@@ -2062,7 +2146,7 @@ if numel(sz) < 2 || exciteCh < 1 || exciteCh > sz(1)
     return;
 end
 if isempty(respChannels)
-    msg = 'Resp Ch(s) is empty';
+    msg = 'Stiff Ch is empty';
     title(ax, 'Dynamic Stiffness (empty response channels)');
     return;
 end
@@ -2140,7 +2224,7 @@ if plottedCount == 0
     if isempty(skippedResp)
         msg = 'no valid stiffness points';
     else
-        msg = ['no valid stiffness points for Resp Ch(s): ' formatChannelList(skippedResp)];
+        msg = ['no valid stiffness points for Stiff Ch: ' formatChannelList(skippedResp)];
     end
     return;
 end
@@ -2153,7 +2237,7 @@ if ~keepExisting
 end
 
 if ~isempty(skippedResp)
-    msg = ['skipped Resp Ch(s): ' formatChannelList(skippedResp)];
+    msg = ['skipped Stiff Ch: ' formatChannelList(skippedResp)];
 end
 ok = true;
 end
@@ -2183,7 +2267,7 @@ if numel(sz) < 2 || exciteCh < 1 || exciteCh > sz(1)
     return;
 end
 if isempty(respChannels)
-    msg = 'Resp Ch(s) is empty';
+    msg = 'Stiff Ch is empty';
     title(ax, 'Coherence (empty response channels)');
     return;
 end
@@ -2245,7 +2329,7 @@ if plottedCount == 0
     if isempty(skippedResp)
         msg = 'no valid coherence points';
     else
-        msg = ['no valid coherence points for Resp Ch(s): ' formatChannelList(skippedResp)];
+        msg = ['no valid coherence points for Stiff Ch: ' formatChannelList(skippedResp)];
     end
     return;
 end
@@ -2255,7 +2339,7 @@ if ~keepExisting
 end
 
 if ~isempty(skippedResp)
-    msg = ['skipped Resp Ch(s): ' formatChannelList(skippedResp)];
+    msg = ['skipped Stiff Ch: ' formatChannelList(skippedResp)];
 end
 
 ok = true;
@@ -2579,11 +2663,11 @@ n = numel(files);
 if n <= 3
     names = cell(1, n);
     for i = 1:n
-        names{i} = files{i}.fileName;
+        names{i} = getSeriesDisplayFileName(files{i}.fileName);
     end
     txt = strjoin(names, '; ');
 else
-    txt = sprintf('%d files loaded (last: %s)', n, files{end}.fileName);
+    txt = sprintf('%d files loaded (last: %s)', n, getSeriesDisplayFileName(files{end}.fileName));
 end
 end
 
@@ -2602,6 +2686,7 @@ for fi = 1:numel(app.files)
     for ci = 1:numel(F.validChannels)
         ch = F.validChannels(ci);
         label = getSeriesBaseLabel(app, F, ch);
+        label = stripVnaSuffixInSeriesLabel(label);
         % Keep labels unique even when same file is loaded multiple times.
         base = label;
         k = 2;
@@ -2655,11 +2740,48 @@ end
 function label = getSeriesBaseLabel(app, F, ch)
 label = getCustomSeriesLabel(app, F.id, ch);
 if isempty(label)
-    label = sprintf('%s+ch%d', F.fileName, ch);
+    label = sprintf('%s+ch%d', getSeriesDisplayFileName(F.fileName), ch);
 end
 end
 
 % 查询指定文件+通道的自定义显示名
+function name = getSeriesDisplayFileName(fileName)
+name = fileName;
+if iscell(name)
+    if isempty(name)
+        name = '';
+    else
+        name = name{1};
+    end
+end
+if ~ischar(name)
+    try
+        if isstring(name) && isscalar(name)
+            name = char(name);
+        end
+    catch
+    end
+end
+if ~ischar(name) || isempty(name)
+    return;
+end
+[stem, ext] = fileparts(name);
+if strcmpi(ext, '.vna')
+    name = stem;
+end
+end
+
+function label = stripVnaSuffixInSeriesLabel(label)
+if ~ischar(label) || isempty(label)
+    return;
+end
+% Remove ".vna" only in default-like labels such as "name.vna+ch2" / "name.vna+ch2#2".
+try
+    label = regexprep(label, '(?i)\.vna(?=\+ch\d+(#\d+)?$)', '');
+catch
+end
+end
+
 function label = getCustomSeriesLabel(app, fileId, ch)
 label = '';
 for i = 1:numel(app.customSeriesNames)

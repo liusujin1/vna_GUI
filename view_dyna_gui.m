@@ -229,7 +229,7 @@ set([btnPlot, btnHold, btnClear, lblStatus], 'Parent', grpPlot);
 
 tabRight = uitabgroup('Parent', fig, 'Units', 'pixels', 'Position', [390 15 1095 860]);
 tabMain = uitab('Parent', tabRight, 'Title', 'Main');
-tabFoundation = uitab('Parent', tabRight, 'Title', 'Foundation');
+tabFoundation = uitab('Parent', tabRight, 'Title', 'Floor Vibration');
 try
     set(tabRight, 'SelectionChangedFcn', @onTabChanged);
 catch
@@ -398,9 +398,18 @@ set(axFoundCoh, 'XScale', 'log', 'YScale', 'linear');
 ylim(axFoundCoh, [0 1]);
 grid(axFoundCoh, 'on');
 
+btnFoundVibFig = uicontrol('Parent', tabFoundation, 'Style', 'pushbutton', ...
+    'String', 'Figure', ...
+    'Position', [980 720 62 26]);
+btnFoundStiffCohFig = uicontrol('Parent', tabFoundation, 'Style', 'pushbutton', ...
+    'String', 'Figure', ...
+    'Position', [980 420 62 26]);
+
 set(btnFig1, 'Callback', @(~, ~) onOpenAxisFigure(axMain1, 'Plot 1'));
 set(btnFig2, 'Callback', @(~, ~) onOpenAxisFigure(axMain2, 'Plot 2'));
 set(btnFig3, 'Callback', @(~, ~) onOpenAxisFigure(axMain3, 'Plot 3'));
+set(btnFoundVibFig, 'Callback', @onOpenFoundationVibFigure);
+set(btnFoundStiffCohFig, 'Callback', @onOpenFoundationStiffCohFigure);
 refreshFoundationFileSelectors();
 
 % 绑定窗口尺寸变化回调并执行一次初始布局
@@ -739,8 +748,11 @@ onResize();
         fAxBottomH = floor((fAxAvailH - 2 * fAxGap) / 3);
         fAxMidH = fAxBottomH;
         fAxTopH = fAxAvailH - 2 * fAxGap - fAxMidH - fAxBottomH;
+        fBtnW = 62;
+        fBtnH = 26;
+        fBtnGap = 8;
         fAxX = fPadX;
-        fAxW = max(360, tw - 2 * fPadX);
+        fAxW = max(300, tw - 2 * fPadX - fBtnW - fBtnGap);
         fAxBottomY = fBottomPad;
         fAxMidY = fAxBottomY + fAxBottomH + fAxGap;
         fAxTopY = fAxMidY + fAxMidH + fAxGap;
@@ -748,6 +760,15 @@ onResize();
         set(axFoundVib, 'OuterPosition', [fAxX, fAxTopY, fAxW, fAxTopH]);
         set(axFoundStiff, 'OuterPosition', [fAxX, fAxMidY, fAxW, fAxMidH]);
         set(axFoundCoh, 'OuterPosition', [fAxX, fAxBottomY, fAxW, fAxBottomH]);
+
+        fBtnX = fAxX + fAxW + fBtnGap;
+        if (fBtnX + fBtnW) > (tw - fPadX)
+            fBtnX = tw - fPadX - fBtnW;
+        end
+        vibBtnY = max(fAxTopY + fAxTopH - fBtnH - 2, fAxTopY + 2);
+        stiffBtnY = max(fAxMidY + fAxMidH - fBtnH - 2, fAxMidY + 2);
+        set(btnFoundVibFig, 'Position', [fBtnX, vibBtnY, fBtnW, fBtnH]);
+        set(btnFoundStiffCohFig, 'Position', [fBtnX, stiffBtnY, fBtnW, fBtnH]);
     end
 
     % 加载数据文件（支持多选），并重建“数据项列表”
@@ -959,13 +980,27 @@ onResize();
             cla(axMain1); cla(axMain2); cla(axMain3);
         end
 
-        renderOneAxis(axMain1, getPopupSelection(ddSel1), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
-        renderOneAxis(axMain2, getPopupSelection(ddSel2), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
-        renderOneAxis(axMain3, getPopupSelection(ddSel3), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
+        [~, msg1] = renderOneAxis(axMain1, getPopupSelection(ddSel1), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
+        [~, msg2] = renderOneAxis(axMain2, getPopupSelection(ddSel2), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
+        [~, msg3] = renderOneAxis(axMain3, getPopupSelection(ddSel3), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
+        detailMsgs = {};
+        if ~isempty(msg1)
+            detailMsgs{end + 1} = msg1; %#ok<AGROW>
+        end
+        if ~isempty(msg2)
+            detailMsgs{end + 1} = msg2; %#ok<AGROW>
+        end
+        if ~isempty(msg3)
+            detailMsgs{end + 1} = msg3; %#ok<AGROW>
+        end
+        detailText = '';
+        if ~isempty(detailMsgs)
+            detailText = [' | ' strjoin(detailMsgs, '; ')];
+        end
         if keepExisting
-            set(lblStatus, 'String', sprintf('Status: HOLD ON, appended %d entries', numel(selectedSeries)));
+            set(lblStatus, 'String', sprintf('Status: HOLD ON, appended %d entries%s', numel(selectedSeries), detailText));
         else
-            set(lblStatus, 'String', sprintf('Status: plotted %d selected entries', numel(selectedSeries)));
+            set(lblStatus, 'String', sprintf('Status: plotted %d selected entries%s', numel(selectedSeries), detailText));
         end
     end
 
@@ -977,8 +1012,29 @@ onResize();
         end
 
         figName = getAxisExportTitle(sourceAx, fallbackTitle);
-        cloneAxisToFigure(sourceAx, figName);
+        cloneAxisToFigure(sourceAx, figName, 'northeast');
         set(lblStatus, 'String', sprintf('Status: opened "%s" in a separate figure', figName));
+    end
+
+    function onOpenFoundationVibFigure(~, ~)
+        if countLineLikeChildren(axFoundVib) == 0
+            showAlertCompat(fig, 'Foundation vibration plot is empty. Please plot data first.', 'Tip');
+            return;
+        end
+        figName = getAxisExportTitle(axFoundVib, 'Floor Vibration');
+        cloneAxisToFigure(axFoundVib, figName, 'northwest');
+        set(lblStatus, 'String', sprintf('Status: opened "%s" in a separate figure', figName));
+    end
+
+    function onOpenFoundationStiffCohFigure(~, ~)
+        hasStiff = countLineLikeChildren(axFoundStiff) > 0;
+        hasCoh = countLineLikeChildren(axFoundCoh) > 0;
+        if ~hasStiff && ~hasCoh
+            showAlertCompat(fig, 'Foundation stiffness/coherence plots are empty. Please plot data first.', 'Tip');
+            return;
+        end
+        cloneTwoAxesToFigure(axFoundStiff, axFoundCoh, 'Dynamic Stiffness + Coherence', 'northwest');
+        set(lblStatus, 'String', 'Status: opened foundation stiffness/coherence in one figure');
     end
 
     % 在重命名输入框按回车时触发重命名
@@ -1068,8 +1124,9 @@ onResize();
     end
 
     % 按 mode 在指定坐标轴上绘图（Time/PSD/Trans）
-    function usedRef = renderOneAxis(ax, mode, selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode)
+    function [usedRef, statusMsg] = renderOneAxis(ax, mode, selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode)
         usedRef = NaN;
+        statusMsg = '';
         styleAxisCompat(ax);
         switch mode
             case 'Time'
@@ -1204,20 +1261,24 @@ onResize();
                 anyTr = false;
                 colorIdx = countLineLikeChildren(ax) + 1;
                 xMin = inf; xMax = -inf; yMin = inf; yMax = -inf;
-                usedRef = refInput;
+                usedRef = 1;
+                skippedSelfCount = 0;
+                skippedMissingCount = 0;
                 for si = 1:numel(selectedSeries)
                     S = selectedSeries{si};
                     F = app.files{S.fileIdx};
                     if ~F.vna.available
+                        skippedMissingCount = skippedMissingCount + 1;
                         continue;
                     end
-                    refCh = chooseNearestValid(refInput, F.validChannels);
-                    usedRef = refCh;
-                    if S.ch == refCh || ~ismember(S.ch, F.validChannels)
+                    refCh = 1;
+                    if S.ch == refCh
+                        skippedSelfCount = skippedSelfCount + 1;
                         continue;
                     end
                     [f, trDb] = getTransRatio(F, S.ch, refCh);
                     if isempty(f)
+                        skippedMissingCount = skippedMissingCount + 1;
                         continue;
                     end
                     safeSemilogx(ax, f, trDb, 'LineWidth', 1.1, ...
@@ -1248,6 +1309,9 @@ onResize();
                 else
                     title(ax, 'Transmissibility (no valid data)');
                     legend(ax, 'off');
+                end
+                if skippedSelfCount > 0 || skippedMissingCount > 0
+                    statusMsg = sprintf('Trans skipped self:%d, missing-xfer:%d', skippedSelfCount, skippedMissingCount);
                 end
 
             case 'Coherence'
@@ -1812,29 +1876,34 @@ end
 if ch < 1 || ch > F.vna.nCh || refCh < 1 || refCh > F.vna.nCh
     return;
 end
-ak = safeCellGet(F.vna.aspec, ch);
-ar = safeCellGet(F.vna.aspec, refCh);
-if isempty(ak) || isempty(ar) || isempty(F.vna.freq)
+if ~isfield(F.vna, 'xcmeas') || isempty(F.vna.xcmeas) || isempty(F.vna.freq)
     return;
 end
-M = min([numel(F.vna.freq), numel(ak), numel(ar)]);
-f0 = F.vna.freq(1:M);
-rbw = F.vna.rbw;
-if ~isfinite(rbw) || rbw <= 0
+xc = F.vna.xcmeas;
+sz = size(xc);
+if numel(sz) < 2 || refCh > sz(1) || ch > sz(2)
     return;
 end
+if ~isstruct(xc(refCh, ch)) || ~isfield(xc(refCh, ch), 'xfer') || isempty(xc(refCh, ch).xfer)
+    return;
+end
+xfer = xc(refCh, ch).xfer(:);
+M = min(numel(F.vna.freq), numel(xfer));
+if M < 3
+    return;
+end
+f0 = F.vna.freq(2:M);
+x = xfer(2:M);
 euK = safeGet(F.vna.eu, ch, 1);
 euR = safeGet(F.vna.eu, refCh, 1);
-
-% Per-channel magnitude scaling required by user:
-% scaled(ch) = aspec(ch) * eu_val(ch)^2 / rbw
-num = ak(1:M) * (euK ^ 2) / rbw;
-den = ar(1:M) * (euR ^ 2) / rbw;
-
-valid = isfinite(f0) & isfinite(num) & isfinite(den) & (f0 > 0) & (num > 0) & (den > 0);
+if ~isfinite(euR) || euR == 0
+    return;
+end
+xferCorr = x .* (euK / euR);
+trLin = abs(xferCorr);
+valid = isfinite(f0) & isfinite(trLin) & (f0 > 0) & (trLin > 0);
 f = f0(valid);
-trLin = num(valid) ./ den(valid);
-trDb = 10 * log10(trLin);
+trDb = 20 * log10(trLin(valid));
 end
 
 function [f, coh] = getCoherenceRatio(F, ch, refCh)
@@ -3001,7 +3070,10 @@ end
 end
 
 % 复制当前轴内容到新 Figure（用于单图保存）
-function cloneAxisToFigure(sourceAx, figName)
+function cloneAxisToFigure(sourceAx, figName, legendLoc)
+if nargin < 3 || isempty(legendLoc)
+    legendLoc = 'northeast';
+end
 hFig = figure( ...
     'Name', figName, ...
     'NumberTitle', 'off', ...
@@ -3012,28 +3084,65 @@ hFig = figure( ...
 setFigureRendererCompat(hFig);
 
 newAx = axes('Parent', hFig, 'Units', 'normalized', 'Position', [0.13 0.11 0.775 0.815], 'Box', 'on');
+copyAxisContent(sourceAx, newAx, legendLoc);
+enableInteractiveFigureCompat(hFig);
+end
 
-copyobj(allchild(sourceAx), newAx);
-set(newAx, ...
+% 将两个坐标轴复制到同一 Figure 的 subplot(211/212) 中
+function cloneTwoAxesToFigure(sourceAxTop, sourceAxBottom, figName, legendLoc)
+if nargin < 4 || isempty(legendLoc)
+    legendLoc = 'northeast';
+end
+hFig = figure( ...
+    'Name', figName, ...
+    'NumberTitle', 'off', ...
+    'Color', 'w', ...
+    'MenuBar', 'figure', ...
+    'ToolBar', 'figure', ...
+    'Position', [120 80 920 700]);
+setFigureRendererCompat(hFig);
+
+figure(hFig);
+newAxTop = subplot(2, 1, 1);
+newAxBottom = subplot(2, 1, 2);
+copyAxisContent(sourceAxTop, newAxTop, legendLoc);
+copyAxisContent(sourceAxBottom, newAxBottom, legendLoc);
+enableInteractiveFigureCompat(hFig);
+end
+
+% 复制坐标轴内容及样式到目标轴
+function copyAxisContent(sourceAx, targetAx, legendLoc)
+if nargin < 3 || isempty(legendLoc)
+    legendLoc = 'northeast';
+end
+cla(targetAx);
+copyobj(allchild(sourceAx), targetAx);
+
+set(targetAx, ...
     'XScale', get(sourceAx, 'XScale'), ...
     'YScale', get(sourceAx, 'YScale'), ...
-    'XLim', get(sourceAx, 'XLim'), ...
-    'YLim', get(sourceAx, 'YLim'), ...
     'XGrid', get(sourceAx, 'XGrid'), ...
     'YGrid', get(sourceAx, 'YGrid'), ...
     'Box', get(sourceAx, 'Box'), ...
     'LineWidth', get(sourceAx, 'LineWidth'), ...
     'FontSize', get(sourceAx, 'FontSize'));
-
-xlabel(newAx, get(get(sourceAx, 'XLabel'), 'String'));
-ylabel(newAx, get(get(sourceAx, 'YLabel'), 'String'));
-title(newAx, get(get(sourceAx, 'Title'), 'String'));
-
 try
-    legend(newAx, 'show', 'Location', 'northeast');
+    set(targetAx, 'XLim', get(sourceAx, 'XLim'));
 catch
 end
-enableInteractiveFigureCompat(hFig);
+try
+    set(targetAx, 'YLim', get(sourceAx, 'YLim'));
+catch
+end
+
+xlabel(targetAx, get(get(sourceAx, 'XLabel'), 'String'));
+ylabel(targetAx, get(get(sourceAx, 'YLabel'), 'String'));
+title(targetAx, get(get(sourceAx, 'Title'), 'String'));
+
+try
+    legend(targetAx, 'show', 'Location', legendLoc);
+catch
+end
 end
 
 % 按显示名恢复列表选中项（找不到则回退默认）

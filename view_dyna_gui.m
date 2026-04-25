@@ -255,7 +255,7 @@ lblSel1 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'HorizontalAlignment', 'left', ...
     'Position', [390 870 45 22]);
 ddSel1 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
-    'String', {'Time', 'PSD', 'Trans', 'Coherence'}, ...
+    'String', {'Time', 'PSD', 'CumPSD', 'Trans', 'Coherence'}, ...
     'Value', 1, ...
     'BackgroundColor', 'w', ...
     'Position', [440 868 110 24]);
@@ -268,7 +268,7 @@ lblSel2 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'HorizontalAlignment', 'left', ...
     'Position', [390 620 45 22]);
 ddSel2 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
-    'String', {'Time', 'PSD', 'Trans', 'Coherence'}, ...
+    'String', {'Time', 'PSD', 'CumPSD', 'Trans', 'Coherence'}, ...
     'Value', 2, ...
     'BackgroundColor', 'w', ...
     'Position', [440 618 110 24]);
@@ -281,8 +281,8 @@ lblSel3 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'HorizontalAlignment', 'left', ...
     'Position', [390 370 45 22]);
 ddSel3 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
-    'String', {'Time', 'PSD', 'Trans', 'Coherence'}, ...
-    'Value', 3, ...
+    'String', {'Time', 'PSD', 'CumPSD', 'Trans', 'Coherence'}, ...
+    'Value', 4, ...
     'BackgroundColor', 'w', ...
     'Position', [440 368 110 24]);
 btnFig3 = uicontrol('Parent', tabMain, 'Style', 'pushbutton', ...
@@ -1283,6 +1283,83 @@ onResize();
                     end
                 else
                     title(ax, sprintf('PSD - %s (no valid data)', quantityName));
+                    legend(ax, 'off');
+                end
+
+            case 'CumPSD'
+                set(ax, 'XScale', 'log', 'YScale', 'linear', 'YLimMode', 'auto');
+                hold(ax, 'on');
+                anyCum = false;
+                usePeriodogramFromTime = isPeriodogramSource(psdSourceMode);
+                [quantityName, cumYLabel] = getCumPsdLabel(quantityMode);
+                colorIdx = countLineLikeChildren(ax) + 1;
+                xMin = inf; xMax = -inf; yMin = inf; yMax = -inf;
+                for si = 1:numel(selectedSeries)
+                    S = selectedSeries{si};
+                    F = app.files{S.fileIdx};
+                    if usePeriodogramFromTime
+                        yRaw = safeCellGet(F.rawByCh, S.ch);
+                        if isempty(yRaw)
+                            continue;
+                        end
+                        yProc = applyFilterToSignal( ...
+                            yRaw, F.fs, logical(get(chkLow, 'Value')), getNumericControlValue(edtLowCutoff, 100), ...
+                            logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), getNumericControlValue(edtOrder, 4));
+                        N = min(numel(F.t), numel(yProc));
+                        if N < 2
+                            continue;
+                        end
+                        [~, ySeg] = applyTimeWindow(F.t(1:N), yProc(1:N), timeWindow);
+                        if numel(ySeg) < 2
+                            continue;
+                        end
+                        [f, psdAcc] = computePeriodogramPsd(ySeg, F.fs);
+                    else
+                        [f, psdAcc] = getPsdForChannel(F, S.ch);
+                    end
+                    if isempty(f)
+                        continue;
+                    end
+                    [f, psd] = convertAccelerationPsd( ...
+                        f, psdAcc, quantityMode, ...
+                        logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5));
+                    if isempty(f)
+                        continue;
+                    end
+                    [fCum, yCum] = computeCumulativeSpectrum(f, psd);
+                    if isempty(fCum)
+                        continue;
+                    end
+                    safeSemilogx(ax, fCum, yCum, 'LineWidth', 1.1, ...
+                        'Color', getSeriesColor(colorIdx), 'DisplayName', S.label);
+                    anyCum = true;
+                    colorIdx = colorIdx + 1;
+                    xMin = min(xMin, fCum(1)); xMax = max(xMax, fCum(end));
+                    yMin = min(yMin, min(yCum)); yMax = max(yMax, max(yCum));
+                end
+                hold(ax, 'off');
+                grid(ax, 'on');
+                xlabel(ax, 'Frequency (Hz)');
+                ylabel(ax, cumYLabel);
+                if anyCum
+                    if usePeriodogramFromTime
+                        title(ax, sprintf('CumPSD - %s (periodogram, %d entries)', quantityName, numel(selectedSeries)));
+                    else
+                        title(ax, sprintf('CumPSD - %s (VNA/native, %d entries)', quantityName, numel(selectedSeries)));
+                    end
+                    legend(ax, 'show', 'Location', 'northeast');
+                    if ~keepExisting && isfinite(xMin) && isfinite(xMax) && xMax > xMin
+                        xlim(ax, [xMin, xMax]);
+                    end
+                    if ~keepExisting && isfinite(yMin) && isfinite(yMax)
+                        if yMax <= yMin
+                            ylim(ax, [max(0, yMin - 1), yMin + 1]);
+                        else
+                            ylim(ax, [max(0, yMin), yMax]);
+                        end
+                    end
+                else
+                    title(ax, sprintf('CumPSD - %s (no valid data)', quantityName));
                     legend(ax, 'off');
                 end
 
@@ -2718,6 +2795,22 @@ switch lower(strtrim(quantityMode))
 end
 end
 
+function [quantityName, yLabel] = getCumPsdLabel(quantityMode)
+quantityName = 'Acceleration';
+yLabel = '3sigma Acceleration (m/s^2)';
+if ~ischar(quantityMode)
+    return;
+end
+switch lower(strtrim(quantityMode))
+    case 'velocity'
+        quantityName = 'Velocity';
+        yLabel = '3sigma Velocity (um/s)';
+    case 'displacement'
+        quantityName = 'Displacement';
+        yLabel = '3sigma Displacement (um)';
+end
+end
+
 function yOut = convertAccelerationTimeSeries(yAcc, fs, quantityMode, useHigh, highCutoff)
 yOut = yAcc(:);
 if ~ischar(quantityMode)
@@ -2792,6 +2885,38 @@ end
 valid = isfinite(fOut) & isfinite(psdOut) & (fOut > 0) & (psdOut > 0);
 fOut = fOut(valid);
 psdOut = psdOut(valid);
+end
+
+function [fOut, yOut] = computeCumulativeSpectrum(f, psd)
+fOut = [];
+yOut = [];
+f = f(:);
+psd = psd(:);
+if isempty(f) || isempty(psd) || numel(f) ~= numel(psd)
+    return;
+end
+
+valid = isfinite(f) & isfinite(psd) & (f > 0) & (psd >= 0);
+f = f(valid);
+psd = psd(valid);
+if numel(f) < 2
+    return;
+end
+
+[f, order] = sort(f, 'ascend');
+psd = psd(order);
+cumVal = zeros(size(f));
+for i = 2:numel(f)
+    df = f(i) - f(i - 1);
+    if ~isfinite(df) || df <= 0
+        cumVal(i) = cumVal(i - 1);
+    else
+        cumVal(i) = cumVal(i - 1) + 0.5 * (psd(i - 1) + psd(i)) * df;
+    end
+end
+cumVal = max(cumVal, 0);
+fOut = f;
+yOut = 3 * sqrt(cumVal);
 end
 
 function freqSigned = getSignedFrequencyVector(N, fs)

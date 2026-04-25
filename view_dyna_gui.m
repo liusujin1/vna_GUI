@@ -83,6 +83,16 @@ ddPsdSource = uicontrol('Parent', panel, 'Style', 'popupmenu', ...
     'BackgroundColor', 'w', ...
     'Position', [90 772 240 24]);
 
+lblQuantity = uicontrol('Parent', panel, 'Style', 'text', ...
+    'String', 'Quantity:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [15 742 70 22]);
+ddQuantity = uicontrol('Parent', panel, 'Style', 'popupmenu', ...
+    'String', {'Acceleration', 'Velocity', 'Displacement'}, ...
+    'Value', 1, ...
+    'BackgroundColor', 'w', ...
+    'Position', [90 739 240 24]);
+
 lblDataList = uicontrol('Parent', panel, 'Style', 'text', ...
     'String', 'Data List (File+Channel):', ...
     'HorizontalAlignment', 'left', ...
@@ -221,6 +231,7 @@ set([btnLoad, btnLoadFolder, edtFile, lblDataList, lstData, lblRename, edtRename
     lblScale, edtScale, btnDeleteSelected], 'Parent', grpData);
 
 set([lblFs, edtFs, lblTStart, edtTStart, lblTEnd, edtTEnd, lblPsdSource, ddPsdSource, ...
+    lblQuantity, ddQuantity, ...
     lblFilter, chkLow, chkHigh, lblLowCutoff, edtLowCutoff, lblHighCutoff, edtHighCutoff, ...
     lblOrder, edtOrder, btnReset], 'Parent', grpMainProc);
 set(btnReset, 'String', 'Reset');
@@ -483,7 +494,7 @@ onResize();
         mainH = 0;
         plotH = 0;
         if mainGroupVisible && isMainGroupExpanded
-            mainH = 186;
+            mainH = 214;
         end
         if plotGroupVisible && isPlotGroupExpanded
             plotH = 120;
@@ -611,6 +622,11 @@ onResize();
             psdLabelW = 72;
             set(lblPsdSource, 'Position', [gx, gy - rowH + 4, psdLabelW, 22]);
             set(ddPsdSource, 'Position', [gx + psdLabelW + 4, gy - rowH + 1, innerW - psdLabelW - 4, 24]);
+            gy = gy - rowH - rowGap;
+
+            qtyLabelW = 72;
+            set(lblQuantity, 'Position', [gx, gy - rowH + 4, qtyLabelW, 22]);
+            set(ddQuantity, 'Position', [gx + qtyLabelW + 4, gy - rowH + 1, innerW - qtyLabelW - 4, 24]);
             gy = gy - rowH - rowGap;
 
             resetW = 58;
@@ -974,15 +990,16 @@ onResize();
         end
 
         psdSourceMode = getPopupSelection(ddPsdSource);
+        quantityMode = getQuantityMode(ddQuantity);
 
         refInput = 1;
         if ~keepExisting
             cla(axMain1); cla(axMain2); cla(axMain3);
         end
 
-        [~, msg1] = renderOneAxis(axMain1, getPopupSelection(ddSel1), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
-        [~, msg2] = renderOneAxis(axMain2, getPopupSelection(ddSel2), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
-        [~, msg3] = renderOneAxis(axMain3, getPopupSelection(ddSel3), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode);
+        [~, msg1] = renderOneAxis(axMain1, getPopupSelection(ddSel1), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode, quantityMode);
+        [~, msg2] = renderOneAxis(axMain2, getPopupSelection(ddSel2), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode, quantityMode);
+        [~, msg3] = renderOneAxis(axMain3, getPopupSelection(ddSel3), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode, quantityMode);
         detailMsgs = {};
         if ~isempty(msg1)
             detailMsgs{end + 1} = msg1; %#ok<AGROW>
@@ -1124,7 +1141,7 @@ onResize();
     end
 
     % 按 mode 在指定坐标轴上绘图（Time/PSD/Trans）
-    function [usedRef, statusMsg] = renderOneAxis(ax, mode, selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode)
+    function [usedRef, statusMsg] = renderOneAxis(ax, mode, selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode, quantityMode)
         usedRef = NaN;
         statusMsg = '';
         styleAxisCompat(ax);
@@ -1134,6 +1151,7 @@ onResize();
                 set(ax, 'XLimMode', 'auto', 'YLimMode', 'auto');
                 hold(ax, 'on');
                 anyTime = false;
+                [quantityName, timeYLabel] = getTimeQuantityLabel(quantityMode);
                 colorIdx = countLineLikeChildren(ax) + 1;
                 xMin = inf;
                 xMax = -inf;
@@ -1154,8 +1172,14 @@ onResize();
                     if N < 2
                         continue;
                     end
-                    [tSeg, ySeg] = applyTimeWindow(F.t(1:N), yDraw(1:N), timeWindow);
+                    [tSeg, yAccSeg] = applyTimeWindow(F.t(1:N), yDraw(1:N), timeWindow);
                     if numel(tSeg) < 2
+                        continue;
+                    end
+                    ySeg = convertAccelerationTimeSeries( ...
+                        yAccSeg, F.fs, quantityMode, ...
+                        logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5));
+                    if numel(ySeg) ~= numel(tSeg) || numel(ySeg) < 2
                         continue;
                     end
                     safePlot(ax, tSeg, ySeg, 'LineWidth', 1.1, ...
@@ -1170,9 +1194,9 @@ onResize();
                 hold(ax, 'off');
                 grid(ax, 'on');
                 xlabel(ax, 'Time (s)');
-                ylabel(ax, 'Acceleration (m/s^2)');
+                ylabel(ax, timeYLabel);
                 if anyTime
-                    title(ax, sprintf('Time Domain (%d entries)', numel(selectedSeries)));
+                    title(ax, sprintf('Time Domain - %s (%d entries)', quantityName, numel(selectedSeries)));
                     legend(ax, 'show', 'Location', 'northeast');
                     if ~keepExisting && isfinite(xMin) && isfinite(xMax) && xMax > xMin
                         xlim(ax, [xMin, xMax]);
@@ -1185,7 +1209,7 @@ onResize();
                         end
                     end
                 else
-                    title(ax, 'Time Domain (no valid data)');
+                    title(ax, sprintf('Time Domain - %s (no valid data)', quantityName));
                     legend(ax, 'off');
                 end
 
@@ -1194,6 +1218,7 @@ onResize();
                 hold(ax, 'on');
                 anyPsd = false;
                 usePeriodogramFromTime = isPeriodogramSource(psdSourceMode);
+                [quantityName, psdYLabel] = getPsdQuantityLabel(quantityMode);
                 colorIdx = countLineLikeChildren(ax) + 1;
                 xMin = inf; xMax = -inf; yMin = inf; yMax = -inf;
                 for si = 1:numel(selectedSeries)
@@ -1215,10 +1240,16 @@ onResize();
                         if numel(ySeg) < 2
                             continue;
                         end
-                        [f, psd] = computePeriodogramPsd(ySeg, F.fs);
+                        [f, psdAcc] = computePeriodogramPsd(ySeg, F.fs);
                     else
-                        [f, psd] = getPsdForChannel(F, S.ch);
+                        [f, psdAcc] = getPsdForChannel(F, S.ch);
                     end
+                    if isempty(f)
+                        continue;
+                    end
+                    [f, psd] = convertAccelerationPsd( ...
+                        f, psdAcc, quantityMode, ...
+                        logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5));
                     if isempty(f)
                         continue;
                     end
@@ -1232,12 +1263,12 @@ onResize();
                 hold(ax, 'off');
                 grid(ax, 'on');
                 xlabel(ax, 'Frequency (Hz)');
-                ylabel(ax, '(m/s^2)^2/Hz');
+                ylabel(ax, psdYLabel);
                 if anyPsd
                     if usePeriodogramFromTime
-                        title(ax, sprintf('PSD (periodogram, log-log, %d entries)', numel(selectedSeries)));
+                        title(ax, sprintf('PSD - %s (periodogram, log-log, %d entries)', quantityName, numel(selectedSeries)));
                     else
-                        title(ax, sprintf('PSD (VNA/native, log-log, %d entries)', numel(selectedSeries)));
+                        title(ax, sprintf('PSD - %s (VNA/native, log-log, %d entries)', quantityName, numel(selectedSeries)));
                     end
                     legend(ax, 'show', 'Location', 'northeast');
                     if ~keepExisting && isfinite(xMin) && isfinite(xMax) && xMax > xMin
@@ -1251,7 +1282,7 @@ onResize();
                         end
                     end
                 else
-                    title(ax, 'PSD (no valid data)');
+                    title(ax, sprintf('PSD - %s (no valid data)', quantityName));
                     legend(ax, 'off');
                 end
 
@@ -1392,9 +1423,9 @@ onResize();
         cla(axFoundVib); cla(axFoundStiff); cla(axFoundCoh);
         legend(axMain1, 'off'); legend(axMain2, 'off'); legend(axMain3, 'off');
         legend(axFoundVib, 'off'); legend(axFoundStiff, 'off'); legend(axFoundCoh, 'off');
-        renderOneAxis(axMain1, getPopupSelection(ddSel1), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
-        renderOneAxis(axMain2, getPopupSelection(ddSel2), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
-        renderOneAxis(axMain3, getPopupSelection(ddSel3), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource));
+        renderOneAxis(axMain1, getPopupSelection(ddSel1), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource), getQuantityMode(ddQuantity));
+        renderOneAxis(axMain2, getPopupSelection(ddSel2), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource), getQuantityMode(ddQuantity));
+        renderOneAxis(axMain3, getPopupSelection(ddSel3), {}, getappdata(fig, 'app'), 1, false, [NaN NaN], getPopupSelection(ddPsdSource), getQuantityMode(ddQuantity));
         set(lblStatus, 'String', 'Status: plots cleared');
     end
 
@@ -2642,6 +2673,134 @@ tf = false;
 if ischar(psdSourceMode)
     tf = ~isempty(strfind(lower(psdSourceMode), 'periodogram')); %#ok<STREMP>
 end
+end
+
+function quantityMode = getQuantityMode(h)
+quantityMode = 'Acceleration';
+try
+    quantityMode = getPopupSelection(h);
+catch
+end
+if ~ischar(quantityMode) || isempty(quantityMode)
+    quantityMode = 'Acceleration';
+end
+end
+
+function [quantityName, yLabel] = getTimeQuantityLabel(quantityMode)
+quantityName = 'Acceleration';
+yLabel = 'Acceleration (m/s^2)';
+if ~ischar(quantityMode)
+    return;
+end
+switch lower(strtrim(quantityMode))
+    case 'velocity'
+        quantityName = 'Velocity';
+        yLabel = 'Velocity (um/s)';
+    case 'displacement'
+        quantityName = 'Displacement';
+        yLabel = 'Displacement (um)';
+end
+end
+
+function [quantityName, yLabel] = getPsdQuantityLabel(quantityMode)
+quantityName = 'Acceleration';
+yLabel = '(m/s^2)^2/Hz';
+if ~ischar(quantityMode)
+    return;
+end
+switch lower(strtrim(quantityMode))
+    case 'velocity'
+        quantityName = 'Velocity';
+        yLabel = '(um/s)^2/Hz';
+    case 'displacement'
+        quantityName = 'Displacement';
+        yLabel = 'um^2/Hz';
+end
+end
+
+function yOut = convertAccelerationTimeSeries(yAcc, fs, quantityMode, useHigh, highCutoff)
+yOut = yAcc(:);
+if ~ischar(quantityMode)
+    return;
+end
+modeKey = lower(strtrim(quantityMode));
+if strcmp(modeKey, 'acceleration')
+    return;
+end
+if isempty(yOut) || numel(yOut) < 2 || ~isfinite(fs) || fs <= 0
+    yOut = [];
+    return;
+end
+
+yWork = yOut - mean(yOut);
+N = numel(yWork);
+freqSigned = getSignedFrequencyVector(N, fs);
+omega = 2 * pi * freqSigned;
+Y = fft(yWork);
+
+if useHigh && isfinite(highCutoff) && highCutoff > 0
+    Y(abs(freqSigned) < highCutoff) = 0;
+end
+
+scale = zeros(size(omega));
+nonzero = abs(omega) > 0;
+switch modeKey
+    case 'velocity'
+        scale(nonzero) = 1 ./ (1i * omega(nonzero));
+        yOut = real(ifft(Y .* scale)) * 1e6;
+    case 'displacement'
+        scale(nonzero) = -1 ./ (omega(nonzero) .^ 2);
+        yOut = real(ifft(Y .* scale)) * 1e6;
+    otherwise
+        yOut = yAcc(:);
+end
+end
+
+function [fOut, psdOut] = convertAccelerationPsd(f, psdAcc, quantityMode, useHigh, highCutoff)
+fOut = f(:);
+psdOut = psdAcc(:);
+if isempty(fOut) || isempty(psdOut) || numel(fOut) ~= numel(psdOut)
+    fOut = [];
+    psdOut = [];
+    return;
+end
+valid = isfinite(fOut) & isfinite(psdOut) & (fOut > 0) & (psdOut > 0);
+fOut = fOut(valid);
+psdOut = psdOut(valid);
+if isempty(fOut)
+    return;
+end
+
+if ~ischar(quantityMode)
+    quantityMode = 'Acceleration';
+end
+modeKey = lower(strtrim(quantityMode));
+omega = 2 * pi * fOut;
+switch modeKey
+    case 'velocity'
+        psdOut = psdOut ./ (omega .^ 2) * 1e12;
+    case 'displacement'
+        psdOut = psdOut ./ (omega .^ 4) * 1e12;
+end
+
+if ~strcmp(modeKey, 'acceleration') && useHigh && isfinite(highCutoff) && highCutoff > 0
+    keep = fOut >= highCutoff;
+    fOut = fOut(keep);
+    psdOut = psdOut(keep);
+end
+
+valid = isfinite(fOut) & isfinite(psdOut) & (fOut > 0) & (psdOut > 0);
+fOut = fOut(valid);
+psdOut = psdOut(valid);
+end
+
+function freqSigned = getSignedFrequencyVector(N, fs)
+if mod(N, 2) == 0
+    k = [0:(N / 2), (-N / 2 + 1):-1]';
+else
+    k = [0:((N - 1) / 2), (-((N - 1) / 2)):-1]';
+end
+freqSigned = k * (fs / N);
 end
 
 % Compute PSD with periodogram from time-domain segment.

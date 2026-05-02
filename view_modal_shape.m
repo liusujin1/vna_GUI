@@ -19,6 +19,8 @@
     app.selectedPointRows = [];
     app.selectedLineRows = [];
     app.selectedFiles = [];
+    app.previewTimer = [];
+    app.previewPhaseIndex = 0;
 
     fig = figure( ...
         'Name', 'Modal Shape Viewer', ...
@@ -27,7 +29,8 @@
         'ToolBar', 'none', ...
         'Color', [0.94 0.94 0.94], ...
         'Units', 'normalized', ...
-        'Position', [0.05 0.05 0.90 0.86]);
+        'Position', [0.05 0.05 0.90 0.86], ...
+        'CloseRequestFcn', @onCloseFigure);
 
     pnlLeft = uipanel( ...
         'Parent', fig, ...
@@ -87,7 +90,7 @@
         'Style', 'text', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.79 0.92 0.020], ...
+        'Position', [0.03 0.805 0.92 0.018], ...
         'String', 'Point table binds each PointID directly to a loaded file name.'); %#ok<NASGU>
 
     txtPointTitle = uicontrol( ... %#ok<NASGU>
@@ -96,14 +99,14 @@
         'String', 'Point Table', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.79 0.40 0.022]); %#ok<NASGU>
+        'Position', [0.03 0.775 0.40 0.022]); %#ok<NASGU>
 
     btnAddPoint = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', 'Add Point', ...
         'Units', 'normalized', ...
-        'Position', [0.62 0.787 0.15 0.028], ...
+        'Position', [0.62 0.784 0.15 0.028], ...
         'Callback', @onAddPointRow); %#ok<NASGU>
 
     btnDeletePoint = uicontrol( ... %#ok<NASGU>
@@ -111,7 +114,7 @@
         'Style', 'pushbutton', ...
         'String', 'Del Point', ...
         'Units', 'normalized', ...
-        'Position', [0.79 0.787 0.16 0.028], ...
+        'Position', [0.79 0.784 0.16 0.028], ...
         'Callback', @onDeletePointRows); %#ok<NASGU>
 
     tblPoints = uitable( ...
@@ -119,6 +122,7 @@
         'Units', 'normalized', ...
         'Position', [0.03 0.44 0.92 0.34], ...
         'ColumnName', {'Use', 'PointID', 'FileName', 'XCh', 'YCh', 'ZCh', 'X', 'Y', 'Z'}, ...
+        'ColumnWidth', {42, 64, 96, 46, 46, 46, 54, 54, 54}, ...
         'ColumnEditable', true(1, 9), ...
         'ColumnFormat', {'logical', 'char', 'char', 'numeric', 'numeric', 'numeric', 'numeric', 'numeric', 'numeric'}, ...
         'CellEditCallback', @onPointTableEdited, ...
@@ -298,6 +302,7 @@
 
     applyCompactFonts();
     layoutModePanel();
+    rotate3d(fig, 'on');
     set(fig, 'ResizeFcn', @onFigureResized);
     refreshAll();
 
@@ -538,15 +543,29 @@
         app.points = parsePointTableData(get(tblPoints, 'Data'));
         rows = unique(app.selectedPointRows);
         if isempty(rows)
+            ud = get(tblPoints, 'UserData');
+            if isnumeric(ud) && ~isempty(ud)
+                rows = unique(ud(:).');
+            end
+        end
+        if isempty(rows) && ~isempty(app.points)
+            rows = 1;
+        end
+        if isempty(rows)
+            updateStatus('Select one or more point rows to delete.');
+            return;
+        end
+        rows = rows(rows >= 1 & rows <= numel(app.points));
+        if isempty(rows)
+            updateStatus('Selected point rows are invalid.');
             return;
         end
         keep = true(1, numel(app.points));
         keep(rows) = false;
         app.points = app.points(keep);
         app.lines = removeInvalidLines(app.lines, app.points);
-        if isempty(app.points)
-            app.points = defaultPointRows();
-        end
+        app.selectedPointRows = [];
+        set(tblPoints, 'UserData', []);
         invalidateFrfState();
         invalidateModeState();
         refreshPointTable();
@@ -573,6 +592,7 @@
 
     function onPointTableSelected(~, event)
         app.selectedPointRows = selectionRows(event);
+        set(tblPoints, 'UserData', app.selectedPointRows);
     end
 
     function onAddLineRow(~, ~)
@@ -840,8 +860,8 @@
             return;
         end
         updateFreqSummary(mode.actualFreq);
-        animateMode(axMode, mode, false, '');
-        updateStatus(sprintf('Previewed mode at %.8g Hz.', mode.actualFreq));
+        startPreviewAnimation(mode);
+        updateStatus(sprintf('Previewing mode at %.8g Hz.', mode.actualFreq));
     end
 
     function onExportGif(~, ~)
@@ -885,28 +905,27 @@
         app.points = parsePointTableData(get(tblPoints, 'Data'));
         app.lines = parseLineTableData(get(tblLines, 'Data'));
         validRows = getUsablePointRows(app.points, app.files);
-        if isempty(validRows)
+        pointGroups = aggregatePointRowsById(validRows);
+        if isempty(pointGroups)
             error('No valid point rows with bound files and coordinates.');
         end
 
-        pointIds = cell(numel(validRows), 1);
-        coords = zeros(numel(validRows), 3);
-        dispComplex = nan(numel(validRows), 3);
-        cohVals = nan(numel(validRows), 3);
-        actualFreqs = nan(numel(validRows), 1);
-        fileNames = cell(numel(validRows), 1);
+        pointIds = cell(numel(pointGroups), 1);
+        coords = zeros(numel(pointGroups), 3);
+        dispComplex = nan(numel(pointGroups), 3);
+        cohVals = nan(numel(pointGroups), 3);
+        actualFreqs = nan(numel(pointGroups), 1);
+        fileNames = cell(numel(pointGroups), 1);
 
-        for iRow = 1:numel(validRows)
-            row = validRows(iRow);
-            fileIdx = findFileIndexByName(app.files, row.fileName);
-            F = app.files(fileIdx);
-            [vec, cohVec, actualFreq] = extractPointModeVector(F, row, targetFreq);
-            pointIds{iRow} = row.pointId;
-            coords(iRow, :) = [row.x, row.y, row.z];
-            dispComplex(iRow, :) = vec;
-            cohVals(iRow, :) = cohVec;
-            actualFreqs(iRow) = actualFreq;
-            fileNames{iRow} = row.fileName;
+        for iGroup = 1:numel(pointGroups)
+            group = pointGroups(iGroup);
+            pointIds{iGroup} = group.pointId;
+            coords(iGroup, :) = group.coords;
+            [vec, cohVec, actualFreq, fileNameLabel] = extractGroupedPointModeVector(group.rows, targetFreq);
+            dispComplex(iGroup, :) = vec;
+            cohVals(iGroup, :) = cohVec;
+            actualFreqs(iGroup) = actualFreq;
+            fileNames{iGroup} = fileNameLabel;
         end
 
         refVal = firstReferenceValue(dispComplex);
@@ -915,6 +934,8 @@
         end
 
         dispComplex = dispComplex ./ refVal;
+        invalidMask = ~isfinite(real(dispComplex)) | ~isfinite(imag(dispComplex));
+        dispComplex(invalidMask) = 0;
         dispReal = real(dispComplex);
         scale = computeDisplayScale(coords, dispReal);
 
@@ -932,6 +953,45 @@
         mode.coh = cohVals;
         mode.scale = scale;
         mode.lines = activeLineRows(app.lines);
+    end
+
+    function [vec, cohVec, actualFreq, fileNameLabel] = extractGroupedPointModeVector(rows, targetFreq)
+        vec = nan(1, 3);
+        cohVec = nan(1, 3);
+        actualLocal = nan(numel(rows), 1);
+        nameList = cell(numel(rows), 1);
+        for iRow = 1:numel(rows)
+            row = rows(iRow);
+            fileIdx = findFileIndexByName(app.files, row.fileName);
+            if fileIdx == 0
+                continue;
+            end
+            F = app.files(fileIdx);
+            [vecLocal, cohLocal, actualOne] = extractPointModeVector(F, row, targetFreq);
+            actualLocal(iRow) = actualOne;
+            nameList{iRow} = row.fileName;
+            for k = 1:3
+                if ~isfinite(real(vecLocal(k))) || ~isfinite(imag(vecLocal(k))) || abs(vecLocal(k)) == 0
+                    continue;
+                end
+                if ~isfinite(real(vec(k))) || ~isfinite(imag(vec(k))) || abs(vec(k)) == 0
+                    vec(k) = vecLocal(k);
+                    cohVec(k) = cohLocal(k);
+                else
+                    cohNew = cohLocal(k);
+                    cohOld = cohVec(k);
+                    if (~isfinite(cohOld) && isfinite(cohNew)) || (isfinite(cohNew) && cohNew > cohOld)
+                        vec(k) = vecLocal(k);
+                        cohVec(k) = cohNew;
+                    end
+                end
+            end
+        end
+        actualFreq = median(actualLocal(isfinite(actualLocal)));
+        if ~isfinite(actualFreq)
+            actualFreq = targetFreq;
+        end
+        fileNameLabel = strjoin(unique(nameList(~cellfun('isempty', nameList))), ', ');
     end
 
     function [vec, cohVec, actualFreq] = extractPointModeVector(F, row, targetFreq)
@@ -1170,18 +1230,20 @@
     function refreshPointAxis()
         cla(axLayout);
         rows = getUsablePointRows(app.points, app.files, false);
-        if isempty(rows)
+        pointGroups = aggregatePointRowsById(rows);
+        if isempty(pointGroups)
             title(axLayout, 'Point Layout');
             view(axLayout, 3);
             axis(axLayout, 'equal');
             return;
         end
-        coords = reshape([[rows.x]; [rows.y]; [rows.z]], 3, []).';
-        pointIds = cell(numel(rows), 1);
-        bound = false(numel(rows), 1);
-        for i = 1:numel(rows)
-            pointIds{i} = rows(i).pointId;
-            bound(i) = findFileIndexByName(app.files, rows(i).fileName) > 0;
+        coords = zeros(numel(pointGroups), 3);
+        pointIds = cell(numel(pointGroups), 1);
+        bound = false(numel(pointGroups), 1);
+        for i = 1:numel(pointGroups)
+            pointIds{i} = pointGroups(i).pointId;
+            coords(i, :) = pointGroups(i).coords;
+            bound(i) = any(pointGroups(i).boundMask);
         end
 
         lineInfo = buildRenderableLines(app.lines, pointIds, coords);
@@ -1206,6 +1268,7 @@
             title(axMode, 'Mode Shape Preview');
             axis(axMode, 'equal');
             view(axMode, 3);
+            hidePreviewAxis(axMode);
             return;
         end
         renderModeSkeleton(axMode, app.lastMode, 1, true);
@@ -1234,6 +1297,7 @@
         end
         hold(ax, 'off');
         styleStructureAxis(ax, [coords; coordsDef]);
+        hidePreviewAxis(ax);
         title(ax, sprintf('Mode Shape Preview - Request %.4g Hz / Actual %.4g Hz', mode.requestedFreq, mode.actualFreq));
     end
 
@@ -1269,6 +1333,60 @@
         if exportOnly && ishghandle(figGif)
             close(figGif);
         end
+    end
+
+    function startPreviewAnimation(mode)
+        stopPreviewAnimation(false);
+        app.previewPhaseIndex = 0;
+        renderModeSkeleton(axMode, mode, 0, false);
+        app.previewTimer = timer( ...
+            'ExecutionMode', 'fixedSpacing', ...
+            'Period', 0.08, ...
+            'BusyMode', 'drop', ...
+            'TimerFcn', @onPreviewTimerTick, ...
+            'ErrorFcn', @onPreviewTimerError);
+        start(app.previewTimer);
+    end
+
+    function onPreviewTimerTick(~, ~)
+        if ~ishandle(fig) || ~ishandle(axMode) || isempty(app.lastMode)
+            stopPreviewAnimation(false);
+            return;
+        end
+        app.previewPhaseIndex = app.previewPhaseIndex + 1;
+        phaseValue = 2 * pi * mod(app.previewPhaseIndex, 24) / 24;
+        renderModeSkeleton(axMode, app.lastMode, phaseValue, false);
+        drawnow;
+    end
+
+    function onPreviewTimerError(~, ~)
+        stopPreviewAnimation(false);
+    end
+
+    function stopPreviewAnimation(resetToStatic)
+        if nargin < 1
+            resetToStatic = true;
+        end
+        if ~isempty(app.previewTimer)
+            try
+                stop(app.previewTimer);
+            catch
+            end
+            try
+                delete(app.previewTimer);
+            catch
+            end
+            app.previewTimer = [];
+        end
+        app.previewPhaseIndex = 0;
+        if resetToStatic && ishghandle(axMode)
+            refreshModeAxis();
+        end
+    end
+
+    function onCloseFigure(~, ~)
+        stopPreviewAnimation(false);
+        delete(fig);
     end
 
     function exportModeGif(gifPath, mode)
@@ -1525,6 +1643,7 @@
         if ~isfinite(freqVal) || freqVal <= 0
             return;
         end
+        stopPreviewAnimation(false);
         app.activeModeFreq = freqVal;
         set(edtModeFreq, 'String', sprintf('%.8g', freqVal));
         updateFreqSummary(NaN);
@@ -1589,6 +1708,7 @@
     end
 
     function invalidateModeState()
+        stopPreviewAnimation(false);
         app.lastMode = [];
         if isfinite(app.activeModeFreq)
             app.currentFrf.pickedFreq = app.activeModeFreq;
@@ -1650,6 +1770,23 @@
         grid(ax, 'off');
     end
 
+    function hidePreviewAxis(ax)
+        axis(ax, 'off');
+        set(ax, ...
+            'Visible', 'off', ...
+            'Color', 'none', ...
+            'XColor', 'none', ...
+            'YColor', 'none', ...
+            'ZColor', 'none', ...
+            'XTick', [], ...
+            'YTick', [], ...
+            'ZTick', [], ...
+            'Box', 'off');
+        xlabel(ax, '');
+        ylabel(ax, '');
+        zlabel(ax, '');
+    end
+
     function rows = getUsablePointRows(points, files, requireBound)
         if nargin < 3
             requireBound = true;
@@ -1675,9 +1812,10 @@
 
     function ids = validPointIdList(points)
         rows = getUsablePointRows(points, app.files, false);
-        ids = cell(numel(rows), 1);
-        for i = 1:numel(rows)
-            ids{i} = rows(i).pointId;
+        groups = aggregatePointRowsById(rows);
+        ids = cell(numel(groups), 1);
+        for i = 1:numel(groups)
+            ids{i} = groups(i).pointId;
         end
     end
 
@@ -1731,6 +1869,7 @@
 
     function linesOut = inferAutoLines(points)
         rows = getUsablePointRows(points, app.files, false);
+        rows = aggregatePointRowsById(rows);
         linesOut = struct('use', {}, 'startPointId', {}, 'endPointId', {}, 'source', {});
         if numel(rows) < 2
             return;
@@ -1740,7 +1879,7 @@
         coords = zeros(numel(rows), 3);
         for i = 1:numel(rows)
             pointIds{i} = rows(i).pointId;
-            coords(i, :) = [rows(i).x, rows(i).y, rows(i).z];
+            coords(i, :) = rows(i).coords;
         end
 
         distMat = pairwiseDistances(coords);
@@ -1970,6 +2109,34 @@
         end
     end
 
+    function groups = aggregatePointRowsById(rows)
+        groups = struct('pointId', {}, 'coords', {}, 'rows', {}, 'boundMask', {});
+        if isempty(rows)
+            return;
+        end
+        keys = {};
+        for i = 1:numel(rows)
+            row = rows(i);
+            key = upper(strtrim(row.pointId));
+            if isempty(key)
+                continue;
+            end
+            idx = find(strcmp(keys, key), 1, 'first');
+            isBound = findFileIndexByName(app.files, row.fileName) > 0;
+            if isempty(idx)
+                idx = numel(keys) + 1;
+                keys{idx} = key; %#ok<AGROW>
+                groups(idx).pointId = row.pointId; %#ok<AGROW>
+                groups(idx).coords = [row.x, row.y, row.z];
+                groups(idx).rows = row;
+                groups(idx).boundMask = isBound;
+            else
+                groups(idx).rows(end + 1) = row; %#ok<AGROW>
+                groups(idx).boundMask(end + 1) = isBound; %#ok<AGROW>
+            end
+        end
+    end
+
     function [freqAligned, seriesAligned, auxAligned] = alignFreqAndSeries(freqRaw, seriesRaw, auxRaw)
         freqAligned = [];
         seriesAligned = [];
@@ -2127,7 +2294,6 @@
     function rows = parsePointTableData(data)
         rows = struct('use', {}, 'pointId', {}, 'fileName', {}, 'xCh', {}, 'yCh', {}, 'zCh', {}, 'x', {}, 'y', {}, 'z', {});
         if isempty(data)
-            rows = defaultPointRows();
             return;
         end
         for i = 1:size(data, 1)
@@ -2142,9 +2308,6 @@
             row.y = numericFromValue(data{i, 8}, row.y);
             row.z = numericFromValue(data{i, 9}, row.z);
             rows(end + 1) = row; %#ok<AGROW>
-        end
-        if isempty(rows)
-            rows = defaultPointRows();
         end
     end
 

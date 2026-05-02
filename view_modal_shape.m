@@ -1,13 +1,12 @@
-function view_modal_shape()
-%VIEW_MODAL_SHAPE 提取模态振型并导出动图
-% 该脚本独立于现有振动 GUI，面向 .vna 模态测试数据的振型查看。
+﻿function view_modal_shape()
+%VIEW_MODAL_SHAPE 提取模态振型并导出动画。
+% 独立于现有振动 GUI，面向 .vna 模态测试数据。
 % 主要功能：
-% 1. 加载单个文件或整个文件夹中的 .vna 文件；
-% 2. 用表格管理测点、三方向通道与空间坐标；
-% 3. 自动推断测点骨架连线，并允许手工修正；
-% 4. 基于复数 FRF 提取目标频率下的工程振型；
-% 5. 预览骨架振型并导出 GIF 动图。
-
+% 1. 加载单个文件或整个文件夹内的 .vna 文件。
+% 2. 用表格管理测点、三方向通道和空间坐标。
+% 3. 自动推断测点骨架连线，并允许手工修正。
+% 4. 基于复数 FRF 提取目标频率下的工程振型。
+% 5. 预览骨架振型并导出 GIF 动画。
     app = struct();
     app.files = struct('name', {}, 'path', {}, 'freq', {}, 'xcmeas', {}, 'eu', {}, 'coh', {}, 'nResp', {});
     app.points = defaultPointRows();
@@ -48,29 +47,29 @@ function view_modal_shape()
         'Units', 'normalized', ...
         'Position', [0.67 0.56 0.29 0.38]);
 
-    btnLoadFiles = uicontrol( ...
+    btnLoadFiles = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', 'Load Files', ...
         'Units', 'normalized', ...
         'Position', [0.03 0.95 0.22 0.04], ...
-        'Callback', @onLoadFiles);
+        'Callback', @onLoadFiles); %#ok<NASGU>
 
-    btnLoadFolder = uicontrol( ...
+    btnLoadFolder = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', 'Load Folder', ...
         'Units', 'normalized', ...
         'Position', [0.27 0.95 0.22 0.04], ...
-        'Callback', @onLoadFolder);
+        'Callback', @onLoadFolder); %#ok<NASGU>
 
-    btnDeleteFiles = uicontrol( ...
+    btnDeleteFiles = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', 'Delete Files', ...
         'Units', 'normalized', ...
         'Position', [0.51 0.95 0.44 0.04], ...
-        'Callback', @onDeleteFiles);
+        'Callback', @onDeleteFiles); %#ok<NASGU>
 
     lstFiles = uicontrol( ...
         'Parent', pnlLeft, ...
@@ -83,37 +82,37 @@ function view_modal_shape()
         'Value', 1, ...
         'Callback', @onFileSelectionChanged);
 
-    txtFileHint = uicontrol( ...
+    txtFileHint = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'text', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
         'Position', [0.03 0.79 0.92 0.020], ...
-        'String', 'Point table binds each PointID directly to a loaded file name.');
+        'String', 'Point table binds each PointID directly to a loaded file name.'); %#ok<NASGU>
 
-    txtPointTitle = uicontrol( ...
+    txtPointTitle = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'text', ...
         'String', 'Point Table', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.79 0.40 0.022]);
+        'Position', [0.03 0.79 0.40 0.022]); %#ok<NASGU>
 
-    btnAddPoint = uicontrol( ...
+    btnAddPoint = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', 'Add Point', ...
         'Units', 'normalized', ...
         'Position', [0.62 0.787 0.15 0.028], ...
-        'Callback', @onAddPointRow);
+        'Callback', @onAddPointRow); %#ok<NASGU>
 
-    btnDeletePoint = uicontrol( ...
+    btnDeletePoint = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', 'Del Point', ...
         'Units', 'normalized', ...
         'Position', [0.79 0.787 0.16 0.028], ...
-        'Callback', @onDeletePointRows);
+        'Callback', @onDeletePointRows); %#ok<NASGU>
 
     tblPoints = uitable( ...
         'Parent', pnlLeft, ...
@@ -125,37 +124,37 @@ function view_modal_shape()
         'CellEditCallback', @onPointTableEdited, ...
         'CellSelectionCallback', @onPointTableSelected);
 
-    txtLineTitle = uicontrol( ...
+    txtLineTitle = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'text', ...
         'String', 'Line Table', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.40 0.36 0.020]);
+        'Position', [0.03 0.40 0.36 0.020]); %#ok<NASGU>
 
-    btnAutoLines = uicontrol( ...
+    btnAutoLines = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', 'Auto Lines', ...
         'Units', 'normalized', ...
         'Position', [0.42 0.40 0.22 0.026], ...
-        'Callback', @onAutoBuildLines);
+        'Callback', @onAutoBuildLines); %#ok<NASGU>
 
-    btnAddLine = uicontrol( ...
+    btnAddLine = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', 'Add Line', ...
         'Units', 'normalized', ...
         'Position', [0.66 0.40 0.13 0.026], ...
-        'Callback', @onAddLineRow);
+        'Callback', @onAddLineRow); %#ok<NASGU>
 
-    btnDeleteLine = uicontrol( ...
+    btnDeleteLine = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', 'Del Line', ...
         'Units', 'normalized', ...
         'Position', [0.81 0.40 0.14 0.026], ...
-        'Callback', @onDeleteLineRows);
+        'Callback', @onDeleteLineRows); %#ok<NASGU>
 
     tblLines = uitable( ...
         'Parent', pnlLeft, ...
@@ -449,7 +448,7 @@ function view_modal_shape()
             end
             try
                 F = parseModalVnaFile(filePath);
-                app.files(end+1) = F; %#ok<AGROW>
+                app.files(end+1) = F;
                 added = added + 1;
             catch ME
                 messages{end+1} = sprintf('Failed to load %s: %s', baseName, ME.message); %#ok<AGROW>
@@ -527,7 +526,7 @@ function view_modal_shape()
                 newRow.fileName = app.files(1).name;
             end
         end
-        app.points(end+1) = newRow; %#ok<AGROW>
+        app.points(end+1) = newRow;
         invalidateFrfState();
         refreshPointTable();
         refreshPointAxis();
@@ -584,7 +583,7 @@ function view_modal_shape()
             newLine.startPointId = pointIds{1};
             newLine.endPointId = pointIds{2};
         end
-        app.lines(end+1) = newLine; %#ok<AGROW>
+        app.lines(end+1) = newLine;
         refreshLineTable();
         refreshPointAxis();
         refreshModeAxis();
@@ -959,12 +958,15 @@ function view_modal_shape()
                 continue;
             end
             [xfer, coh] = getCorrectedXfer(F, 1, ch);
-            if isempty(xfer) || idx > numel(xfer)
+            [freqAligned, xferAligned, cohAligned] = alignFreqAndSeries(F.freq, xfer, coh);
+            if isempty(freqAligned) || isempty(xferAligned)
                 continue;
             end
-            vec(k) = xfer(idx);
-            if ~isempty(coh) && idx <= numel(coh)
-                cohVec(k) = coh(idx);
+            [~, idxLocal] = min(abs(freqAligned - targetFreq));
+            actualFreq = freqAligned(idxLocal);
+            vec(k) = xferAligned(idxLocal);
+            if ~isempty(cohAligned) && idxLocal <= numel(cohAligned)
+                cohVec(k) = cohAligned(idxLocal);
             end
         end
     end
@@ -1082,6 +1084,30 @@ function view_modal_shape()
             peakDb = interp1(freq, dbCurve, peakFreqs, 'linear', 'extrap');
             hPeak = semilogx(axFrf, peakFreqs, peakDb, 'ro', 'MarkerFaceColor', 'w', 'LineStyle', 'none', 'MarkerSize', 6, 'LineWidth', 1.0);
             set(hPeak, 'ButtonDownFcn', @onFrfAxisClicked);
+        end
+        if ~isempty(app.manualPeaks)
+            manualFreqs = app.manualPeaks(:);
+            manualFreqs = manualFreqs(isfinite(manualFreqs) & manualFreqs > 0);
+            if ~isempty(manualFreqs)
+                if isfinite(app.activeModeFreq) && app.activeModeFreq > 0
+                    tolActive = max(1e-9, 1e-6 * max(1, abs(app.activeModeFreq)));
+                    manualFreqs = manualFreqs(abs(manualFreqs - app.activeModeFreq) > tolActive);
+                end
+                if isfinite(app.currentFrf.pickedFreq) && app.currentFrf.pickedFreq > 0
+                    tolPicked = max(1e-9, 1e-6 * max(1, abs(app.currentFrf.pickedFreq)));
+                    manualFreqs = manualFreqs(abs(manualFreqs - app.currentFrf.pickedFreq) > tolPicked);
+                end
+                if ~isempty(manualFreqs)
+                    manualDb = interp1(freq, dbCurve, manualFreqs, 'linear', 'extrap');
+                    hManual = semilogx(axFrf, manualFreqs, manualDb, 'd', ...
+                        'Color', [0 0.6 0], ...
+                        'MarkerFaceColor', [0.85 1.0 0.85], ...
+                        'MarkerSize', 7, ...
+                        'LineWidth', 1.0, ...
+                        'LineStyle', 'none');
+                    set(hManual, 'ButtonDownFcn', @onFrfAxisClicked);
+                end
+            end
         end
         if isfinite(app.currentFrf.pickedFreq) && app.currentFrf.pickedFreq > 0 && ...
                 (~isfinite(app.activeModeFreq) || abs(app.currentFrf.pickedFreq - app.activeModeFreq) > max(1e-9, 1e-6 * max(1, abs(app.currentFrf.pickedFreq))))
@@ -1276,13 +1302,16 @@ function view_modal_shape()
                 if isempty(xfer)
                     continue;
                 end
-                f = F.freq(:);
-                valid = isfinite(f) & isfinite(xfer(:)) & abs(xfer(:)) > 0 & f > 0;
+                [f, xferAligned] = alignFreqAndSeries(F.freq, xfer, []);
+                if isempty(f) || isempty(xferAligned)
+                    continue;
+                end
+                valid = isfinite(f) & isfinite(xferAligned) & abs(xferAligned) > 0 & f > 0;
                 if nnz(valid) < 8
                     continue;
                 end
                 f = f(valid);
-                mag = abs(xfer(valid));
+                mag = abs(xferAligned(valid));
                 if isempty(refFreq)
                     refFreq = f;
                     magStack = mag(:);
@@ -1372,12 +1401,14 @@ function view_modal_shape()
         end
         selectedIdx = sort(selectedIdx);
         peakFreqs = 10 .^ logGrid(selectedIdx);
+        peakFreqs = refinePeakFreqsToRawMax(freq, dbCurve, peakFreqs);
 
-        % 强制保留一个低频候选，只要它具备基本突起。
+        % Keep one low-frequency candidate when there is a clear low-band bump.
         lowBand = find(freq <= min(freq) * 8);
         if ~isempty(lowBand)
             [peakFreqs, ~] = ensureLowFrequencyPeak(peakFreqs, freq, smoothDb, lowBand);
         end
+        peakFreqs = refinePeakFreqsToRawMax(freq, dbCurve, peakFreqs);
     end
 
     function [peakFreqs, inserted] = ensureLowFrequencyPeak(peakFreqs, freq, smoothDb, lowBand)
@@ -1407,9 +1438,87 @@ function view_modal_shape()
             return;
         end
         if all(abs(log10(peakFreqs(:)) - log10(lowFreq)) > 0.03)
-            peakFreqs = sort([peakFreqs(:); lowFreq]); %#ok<AGROW>
+            peakFreqs = sort([peakFreqs(:); lowFreq]);
             inserted = true;
         end
+    end
+
+    function peakFreqs = refinePeakFreqsToRawMax(freq, dbCurve, peakFreqs)
+        if isempty(peakFreqs)
+            return;
+        end
+        freq = freq(:);
+        dbCurve = dbCurve(:);
+        valid = isfinite(freq) & isfinite(dbCurve) & freq > 0;
+        freq = freq(valid);
+        dbCurve = dbCurve(valid);
+        if numel(freq) < 3
+            peakFreqs = sort(unique(peakFreqs(:))).';
+            return;
+        end
+
+        logFreq = log10(freq);
+        dLog = diff(logFreq);
+        dLog = dLog(isfinite(dLog) & dLog > 0);
+        if isempty(dLog)
+            searchHalfWidth = 0.025;
+        else
+            searchHalfWidth = max(0.015, 6 * median(dLog));
+        end
+
+        refined = nan(numel(peakFreqs), 1);
+        for iPeak = 1:numel(peakFreqs)
+            f0 = peakFreqs(iPeak);
+            if ~isfinite(f0) || f0 <= 0
+                continue;
+            end
+            logF0 = log10(f0);
+            inWin = abs(logFreq - logF0) <= searchHalfWidth;
+            idxWin = find(inWin);
+            if isempty(idxWin)
+                [~, idxNearest] = min(abs(freq - f0));
+                idxWin = max(1, idxNearest - 3):min(numel(freq), idxNearest + 3);
+            end
+            dbWin = dbCurve(idxWin);
+            [~, idxLocal] = max(dbWin);
+            idxBest = idxWin(idxLocal);
+
+            left = idxBest;
+            while left > idxWin(1) && dbCurve(left - 1) <= dbCurve(left)
+                left = left - 1;
+                if left <= 1
+                    break;
+                end
+            end
+            right = idxBest;
+            while right < idxWin(end) && dbCurve(right + 1) <= dbCurve(right)
+                right = right + 1;
+                if right >= numel(freq)
+                    break;
+                end
+            end
+            [~, idxPeak] = max(dbCurve(left:right));
+            refined(iPeak) = freq(left + idxPeak - 1);
+        end
+
+        refined = refined(isfinite(refined) & refined > 0);
+        if isempty(refined)
+            peakFreqs = [];
+            return;
+        end
+        refined = sort(refined(:));
+        keep = true(size(refined));
+        for i = 2:numel(refined)
+            tolLog = max(0.006, 2 * searchHalfWidth / 3);
+            if abs(log10(refined(i)) - log10(refined(i - 1))) < tolLog
+                if interp1(freq, dbCurve, refined(i), 'linear', -inf) <= interp1(freq, dbCurve, refined(i - 1), 'linear', -inf)
+                    keep(i) = false;
+                else
+                    keep(i - 1) = false;
+                end
+            end
+        end
+        peakFreqs = refined(keep).';
     end
 
     function applyActiveModeFreq(freqVal, ~)
@@ -1425,14 +1534,14 @@ function view_modal_shape()
         refreshFrfAxis();
     end
 
-    function selectCandidateByFrequency(freqVal, sourceLabel, showStatus)
+    function selectCandidateByFrequency(freqVal, ~, showStatus)
         if nargin < 3
             showStatus = true;
         end
         if ~isfinite(freqVal) || freqVal <= 0
             return;
         end
-        applyActiveModeFreq(freqVal, sourceLabel);
+        applyActiveModeFreq(freqVal, []);
         mode = ensureModeExtracted();
         if isempty(mode)
             refreshModeAxis();
@@ -1448,8 +1557,7 @@ function view_modal_shape()
         end
     end
 
-    function updateFreqSummary(actualFreq)
-        %#ok<INUSD>
+    function updateFreqSummary(~)
     end
 
     function addManualPeak(freqVal)
@@ -1461,7 +1569,7 @@ function view_modal_shape()
         if ~isempty(allFreqs) && any(abs(allFreqs - freqVal) <= tol)
             return;
         end
-        app.manualPeaks(end + 1) = freqVal; %#ok<AGROW>
+        app.manualPeaks(end + 1) = freqVal;
         app.manualPeaks = sort(app.manualPeaks);
     end
 
@@ -1681,7 +1789,7 @@ function view_modal_shape()
                 break;
             end
         end
-        edges = [edges; candidate]; %#ok<AGROW>
+        edges = [edges; candidate];
         edges = unique(edges, 'rows');
 
         for i = 1:size(edges, 1)
@@ -1784,7 +1892,7 @@ function view_modal_shape()
 
     function idx = findPointIdIndex(pointIds, pointId)
         idx = 0;
-        key = lower(strtrim(pointId));
+        key = strtrim(pointId);
         for i = 1:numel(pointIds)
             if strcmpi(strtrim(pointIds{i}), key)
                 idx = i;
@@ -1859,6 +1967,49 @@ function view_modal_shape()
         xfer = xfer .* (euResp / euExc);
         if isfield(cellVal, 'coh')
             coh = cellVal.coh(:);
+        end
+    end
+
+    function [freqAligned, seriesAligned, auxAligned] = alignFreqAndSeries(freqRaw, seriesRaw, auxRaw)
+        freqAligned = [];
+        seriesAligned = [];
+        auxAligned = [];
+        if isempty(freqRaw) || isempty(seriesRaw)
+            return;
+        end
+
+        freqVec = freqRaw(:);
+        seriesVec = seriesRaw(:);
+        if isempty(freqVec) || isempty(seriesVec)
+            return;
+        end
+
+        nSeries = numel(seriesVec);
+        nFreq = numel(freqVec);
+        if nFreq == nSeries
+            freqUse = freqVec;
+        elseif nFreq > nSeries
+            freqUse = freqVec(1:nSeries);
+        else
+            seriesVec = seriesVec(1:nFreq);
+            nSeries = nFreq;
+            freqUse = freqVec;
+        end
+
+        if nargin >= 3 && ~isempty(auxRaw)
+            auxVec = auxRaw(:);
+            if numel(auxVec) >= nSeries
+                auxAligned = auxVec(1:nSeries);
+            else
+                auxAligned = [];
+            end
+        end
+
+        valid = isfinite(freqUse) & isfinite(seriesVec) & freqUse > 0;
+        freqAligned = freqUse(valid);
+        seriesAligned = seriesVec(valid);
+        if ~isempty(auxAligned)
+            auxAligned = auxAligned(valid);
         end
     end
 
@@ -2197,3 +2348,4 @@ function view_modal_shape()
     end
 
 end
+

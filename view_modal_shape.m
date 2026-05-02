@@ -702,6 +702,7 @@
     end
 
     function onFindPeaks(~, ~)
+        stopPreviewAnimation(true, true);
         [freq, dbCurve] = buildAggregateFrfCurve();
         if numel(freq) < 3
             updateStatus('Not enough valid FRF data to find peaks.');
@@ -711,7 +712,9 @@
             refreshCandidateList([]);
             return;
         end
-        [peakFreqs, smoothDb] = findProminentPeaks(freq, dbCurve, 12);
+        [peakFreqsMain, smoothDb] = findProminentPeaks(freq, dbCurve, 12);
+        peakFreqsLocal = collectIndividualFrfPeakFreqs(4);
+        peakFreqs = mergePeakFrequencyLists(peakFreqsMain, peakFreqsLocal, 24);
         app.currentFrf.freq = freq;
         app.currentFrf.db = dbCurve;
         app.currentFrf.smoothDb = smoothDb;
@@ -720,7 +723,7 @@
         refreshCandidateList(peakFreqs);
         refreshFrfAxis();
         if ~isempty(peakFreqs)
-            updateStatus(sprintf('Found %d peak candidate(s). Click a candidate in the list to update the mode frequency.', numel(peakFreqs)));
+            updateStatus(sprintf('Found %d peak candidate(s) from aggregate + local FRFs. Click a candidate in the list to update the mode frequency.', numel(peakFreqs)));
         else
             updateStatus('No clear peak candidates found.');
         end
@@ -808,6 +811,7 @@
     end
 
     function onFrfAxisClicked(~, ~)
+        stopPreviewAnimation(true, true);
         freqVal = getClickedFrequency();
         if ~isfinite(freqVal) || freqVal <= 0
             return;
@@ -1271,12 +1275,21 @@
             hidePreviewAxis(axMode);
             return;
         end
-        renderModeSkeleton(axMode, app.lastMode, 1, true);
+        renderModeSkeleton(axMode, app.lastMode, 1, true, false);
     end
 
-    function renderModeSkeleton(ax, mode, phaseValue, showLabels)
+    function renderModeSkeleton(ax, mode, phaseValue, showLabels, preserveView)
         if nargin < 4
             showLabels = false;
+        end
+        if nargin < 5
+            preserveView = false;
+        end
+        if preserveView
+            [az, el] = view(ax);
+            viewState = [az el];
+        else
+            viewState = [];
         end
         coords = mode.coords;
         dispNow = mode.scale * real(mode.dispComplex * exp(1i * phaseValue));
@@ -1296,7 +1309,7 @@
             end
         end
         hold(ax, 'off');
-        styleStructureAxis(ax, [coords; coordsDef]);
+        styleStructureAxis(ax, [coords; coordsDef], viewState);
         hidePreviewAxis(ax);
         title(ax, sprintf('Mode Shape Preview - Request %.4g Hz / Actual %.4g Hz', mode.requestedFreq, mode.actualFreq));
     end
@@ -1317,7 +1330,7 @@
 
         for k = 1:nFrame
             phaseValue = 2 * pi * (k - 1) / nFrame;
-            renderModeSkeleton(axGif, mode, phaseValue, false);
+            renderModeSkeleton(axGif, mode, phaseValue, false, false);
             drawnow;
             if exportOnly
                 frame = getframe(figGif);
@@ -1336,9 +1349,9 @@
     end
 
     function startPreviewAnimation(mode)
-        stopPreviewAnimation(false);
+        stopPreviewAnimation(false, false);
         app.previewPhaseIndex = 0;
-        renderModeSkeleton(axMode, mode, 0, false);
+        renderModeSkeleton(axMode, mode, 0, false, true);
         app.previewTimer = timer( ...
             'ExecutionMode', 'fixedSpacing', ...
             'Period', 0.08, ...
@@ -1350,22 +1363,25 @@
 
     function onPreviewTimerTick(~, ~)
         if ~ishandle(fig) || ~ishandle(axMode) || isempty(app.lastMode)
-            stopPreviewAnimation(false);
+            stopPreviewAnimation(false, false);
             return;
         end
         app.previewPhaseIndex = app.previewPhaseIndex + 1;
         phaseValue = 2 * pi * mod(app.previewPhaseIndex, 24) / 24;
-        renderModeSkeleton(axMode, app.lastMode, phaseValue, false);
+        renderModeSkeleton(axMode, app.lastMode, phaseValue, false, true);
         drawnow;
     end
 
     function onPreviewTimerError(~, ~)
-        stopPreviewAnimation(false);
+        stopPreviewAnimation(false, false);
     end
 
-    function stopPreviewAnimation(resetToStatic)
+    function stopPreviewAnimation(resetToStatic, resetView)
         if nargin < 1
             resetToStatic = true;
+        end
+        if nargin < 2
+            resetView = false;
         end
         if ~isempty(app.previewTimer)
             try
@@ -1379,13 +1395,16 @@
             app.previewTimer = [];
         end
         app.previewPhaseIndex = 0;
+        if resetView && ishghandle(axMode)
+            view(axMode, 3);
+        end
         if resetToStatic && ishghandle(axMode)
             refreshModeAxis();
         end
     end
 
     function onCloseFigure(~, ~)
-        stopPreviewAnimation(false);
+        stopPreviewAnimation(false, false);
         delete(fig);
     end
 
@@ -1529,6 +1548,81 @@
         peakFreqs = refinePeakFreqsToRawMax(freq, dbCurve, peakFreqs);
     end
 
+    function peakFreqs = collectIndividualFrfPeakFreqs(maxPerCurve)
+        peakFreqs = [];
+        rows = getUsablePointRows(app.points, app.files);
+        if isempty(rows)
+            return;
+        end
+        for iRow = 1:numel(rows)
+            row = rows(iRow);
+            fileIdx = findFileIndexByName(app.files, row.fileName);
+            if fileIdx == 0
+                continue;
+            end
+            F = app.files(fileIdx);
+            channels = [row.xCh, row.yCh, row.zCh];
+            for k = 1:numel(channels)
+                ch = channels(k);
+                if ~isfinite(ch) || ch < 1 || ch > F.nResp
+                    continue;
+                end
+                [xfer, ~] = getCorrectedXfer(F, 1, ch);
+                if isempty(xfer)
+                    continue;
+                end
+                [f, xferAligned] = alignFreqAndSeries(F.freq, xfer, []);
+                if isempty(f) || isempty(xferAligned)
+                    continue;
+                end
+                valid = isfinite(f) & isfinite(xferAligned) & abs(xferAligned) > 0 & f > 0;
+                if nnz(valid) < 8
+                    continue;
+                end
+                f = f(valid);
+                dbLocal = 20 * log10(abs(xferAligned(valid)));
+                localPeaks = findProminentPeaks(f, dbLocal, maxPerCurve);
+                if ~isempty(localPeaks)
+                    peakFreqs = [peakFreqs(:); localPeaks(:)]; %#ok<AGROW>
+                end
+            end
+        end
+        peakFreqs = peakFreqs(:);
+    end
+
+    function merged = mergePeakFrequencyLists(primaryFreqs, extraFreqs, maxCount)
+        if nargin < 3 || ~isfinite(maxCount) || maxCount < 1
+            maxCount = inf;
+        end
+        merged = [];
+        primaryFreqs = primaryFreqs(:);
+        extraFreqs = extraFreqs(:);
+        for i = 1:numel(primaryFreqs)
+            merged = appendUniqueFrequency(merged, primaryFreqs(i));
+        end
+        for i = 1:numel(extraFreqs)
+            merged = appendUniqueFrequency(merged, extraFreqs(i));
+        end
+        if numel(merged) > maxCount
+            merged = merged(1:maxCount);
+        end
+        merged = sort(merged(:));
+    end
+
+    function freqList = appendUniqueFrequency(freqList, freqVal)
+        if ~isfinite(freqVal) || freqVal <= 0
+            return;
+        end
+        if isempty(freqList)
+            freqList = freqVal;
+            return;
+        end
+        tolLog = 0.015;
+        if all(abs(log10(freqList(:)) - log10(freqVal)) > tolLog)
+            freqList(end + 1, 1) = freqVal; %#ok<AGROW>
+        end
+    end
+
     function [peakFreqs, inserted] = ensureLowFrequencyPeak(peakFreqs, freq, smoothDb, lowBand)
         inserted = false;
         if isempty(lowBand)
@@ -1643,7 +1737,7 @@
         if ~isfinite(freqVal) || freqVal <= 0
             return;
         end
-        stopPreviewAnimation(false);
+        stopPreviewAnimation(true, true);
         app.activeModeFreq = freqVal;
         set(edtModeFreq, 'String', sprintf('%.8g', freqVal));
         updateFreqSummary(NaN);
@@ -1708,7 +1802,7 @@
     end
 
     function invalidateModeState()
-        stopPreviewAnimation(false);
+        stopPreviewAnimation(true, true);
         app.lastMode = [];
         if isfinite(app.activeModeFreq)
             app.currentFrf.pickedFreq = app.activeModeFreq;
@@ -1747,10 +1841,17 @@
         end
     end
 
-    function styleStructureAxis(ax, coords)
+    function styleStructureAxis(ax, coords, viewState)
+        if nargin < 3
+            viewState = [];
+        end
         if isempty(coords)
             axis(ax, 'equal');
-            view(ax, 3);
+            if numel(viewState) ~= 2 || any(~isfinite(viewState))
+                view(ax, 3);
+            else
+                view(ax, viewState(1), viewState(2));
+            end
             grid(ax, 'off');
             return;
         end
@@ -1766,7 +1867,11 @@
         ylim(ax, center(2) + [-half half]);
         zlim(ax, center(3) + [-half half]);
         axis(ax, 'equal');
-        view(ax, 3);
+        if numel(viewState) ~= 2 || any(~isfinite(viewState))
+            view(ax, 3);
+        else
+            view(ax, viewState(1), viewState(2));
+        end
         grid(ax, 'off');
     end
 

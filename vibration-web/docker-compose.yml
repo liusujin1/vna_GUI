@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  vibration-viewer:
+    build: .
+    ports:
+      - "${VIB_PORT:-8050}:8050"
+    volumes:
+      - /volume1/data/vibration:/data:ro
+    environment:
+      - TZ=Asia/Shanghai
+    mem_limit: 512m
+    restart: unless-stopped

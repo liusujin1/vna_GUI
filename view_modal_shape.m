@@ -42,6 +42,12 @@ function view_modal_shape()
         'Units', 'normalized', ...
         'Position', [0.36 0.01 0.63 0.98]);
 
+    pnlMode = uipanel( ...
+        'Parent', pnlRight, ...
+        'Title', 'Mode', ...
+        'Units', 'normalized', ...
+        'Position', [0.67 0.56 0.29 0.38]);
+
     btnLoadFiles = uicontrol( ...
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
@@ -61,7 +67,7 @@ function view_modal_shape()
     btnDeleteFiles = uicontrol( ...
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Delete Selected File(s)', ...
+        'String', 'Delete Files', ...
         'Units', 'normalized', ...
         'Position', [0.51 0.95 0.44 0.04], ...
         'Callback', @onDeleteFiles);
@@ -70,7 +76,7 @@ function view_modal_shape()
         'Parent', pnlLeft, ...
         'Style', 'listbox', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.80 0.92 0.14], ...
+        'Position', [0.03 0.82 0.92 0.11], ...
         'Min', 0, ...
         'Max', 20, ...
         'String', {'No file loaded'}, ...
@@ -82,7 +88,7 @@ function view_modal_shape()
         'Style', 'text', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.77 0.92 0.025], ...
+        'Position', [0.03 0.79 0.92 0.020], ...
         'String', 'Point table binds each PointID directly to a loaded file name.');
 
     txtPointTitle = uicontrol( ...
@@ -91,28 +97,28 @@ function view_modal_shape()
         'String', 'Point Table', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.74 0.40 0.025]);
+        'Position', [0.03 0.79 0.40 0.022]);
 
     btnAddPoint = uicontrol( ...
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', 'Add Point', ...
         'Units', 'normalized', ...
-        'Position', [0.62 0.74 0.15 0.03], ...
+        'Position', [0.62 0.787 0.15 0.028], ...
         'Callback', @onAddPointRow);
 
     btnDeletePoint = uicontrol( ...
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Delete Point', ...
+        'String', 'Del Point', ...
         'Units', 'normalized', ...
-        'Position', [0.79 0.74 0.16 0.03], ...
+        'Position', [0.79 0.787 0.16 0.028], ...
         'Callback', @onDeletePointRows);
 
     tblPoints = uitable( ...
         'Parent', pnlLeft, ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.47 0.92 0.27], ...
+        'Position', [0.03 0.44 0.92 0.34], ...
         'ColumnName', {'Use', 'PointID', 'FileName', 'XCh', 'YCh', 'ZCh', 'X', 'Y', 'Z'}, ...
         'ColumnEditable', true(1, 9), ...
         'ColumnFormat', {'logical', 'char', 'char', 'numeric', 'numeric', 'numeric', 'numeric', 'numeric', 'numeric'}, ...
@@ -125,14 +131,14 @@ function view_modal_shape()
         'String', 'Line Table', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.44 0.40 0.025]);
+        'Position', [0.03 0.40 0.36 0.020]);
 
     btnAutoLines = uicontrol( ...
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Auto Build Lines', ...
+        'String', 'Auto Lines', ...
         'Units', 'normalized', ...
-        'Position', [0.43 0.44 0.24 0.03], ...
+        'Position', [0.42 0.40 0.22 0.026], ...
         'Callback', @onAutoBuildLines);
 
     btnAddLine = uicontrol( ...
@@ -140,21 +146,21 @@ function view_modal_shape()
         'Style', 'pushbutton', ...
         'String', 'Add Line', ...
         'Units', 'normalized', ...
-        'Position', [0.69 0.44 0.12 0.03], ...
+        'Position', [0.66 0.40 0.13 0.026], ...
         'Callback', @onAddLineRow);
 
     btnDeleteLine = uicontrol( ...
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Delete Line', ...
+        'String', 'Del Line', ...
         'Units', 'normalized', ...
-        'Position', [0.83 0.44 0.12 0.03], ...
+        'Position', [0.81 0.40 0.14 0.026], ...
         'Callback', @onDeleteLineRows);
 
     tblLines = uitable( ...
         'Parent', pnlLeft, ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.30 0.92 0.14], ...
+        'Position', [0.03 0.04 0.92 0.35], ...
         'ColumnName', {'Use', 'StartPointID', 'EndPointID', 'Source'}, ...
         'ColumnEditable', true(1, 4), ...
         'ColumnFormat', {'logical', 'char', 'char', 'char'}, ...
@@ -162,114 +168,106 @@ function view_modal_shape()
         'CellSelectionCallback', @onLineTableSelected);
 
     txtModeTitle = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'text', ...
         'String', 'Mode Frequency', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.265 0.30 0.025]);
+        'Position', [0.05 0.95 0.40 0.03]);
 
     edtModeFreq = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'edit', ...
         'String', '', ...
         'Units', 'normalized', ...
-        'Position', [0.27 0.265 0.17 0.03], ...
+        'Position', [0.05 0.875 0.36 0.05], ...
         'Callback', @onModeFreqEdited);
 
     btnApplyFreq = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
         'String', 'Apply Freq', ...
         'Units', 'normalized', ...
-        'Position', [0.46 0.265 0.18 0.03], ...
+        'Position', [0.45 0.875 0.28 0.05], ...
         'Callback', @onApplyFreq);
 
-    txtActiveFreq = uicontrol( ...
-        'Parent', pnlLeft, ...
-        'Style', 'text', ...
-        'HorizontalAlignment', 'left', ...
-        'String', 'Current: - | Actual: -', ...
-        'Units', 'normalized', ...
-        'Position', [0.66 0.265 0.29 0.025]);
-
     btnFindPeaks = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
         'String', 'Find Peaks', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.225 0.18 0.03], ...
+        'Position', [0.05 0.18 0.21 0.035], ...
         'Callback', @onFindPeaks);
 
     btnExtractMode = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
-        'String', 'Extract Mode', ...
+        'String', 'Extract', ...
         'Units', 'normalized', ...
-        'Position', [0.23 0.225 0.18 0.03], ...
+        'Position', [0.29 0.18 0.18 0.035], ...
         'Callback', @onExtractMode);
 
     btnPreview = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
-        'String', 'Preview Animation', ...
+        'String', 'Preview', ...
         'Units', 'normalized', ...
-        'Position', [0.43 0.225 0.22 0.03], ...
+        'Position', [0.50 0.18 0.18 0.035], ...
         'Callback', @onPreviewMode);
 
     btnExportGif = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
         'String', 'Export GIF', ...
         'Units', 'normalized', ...
-        'Position', [0.67 0.225 0.14 0.03], ...
+        'Position', [0.71 0.18 0.24 0.035], ...
         'Callback', @onExportGif);
 
     txtCandidateTitle = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'text', ...
         'String', 'Mode Candidates', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.19 0.30 0.025]);
+        'Position', [0.05 0.80 0.45 0.025]);
 
     lstCandidates = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'listbox', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.08 0.44 0.11], ...
+        'Position', [0.05 0.34 0.90 0.44], ...
         'String', {'(none)'}, ...
         'Value', 1, ...
         'Callback', @onCandidateSelected);
 
     btnDeletePeak = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
-        'String', 'Delete Peak', ...
+        'String', 'Del Peak', ...
         'Units', 'normalized', ...
-        'Position', [0.83 0.225 0.12 0.03], ...
+        'Position', [0.71 0.135 0.24 0.03], ...
         'Callback', @onDeleteSelectedPeak);
 
     txtPeakHint = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'text', ...
         'HorizontalAlignment', 'left', ...
-        'String', 'Click FRF to add/select manual candidates. Clicking a candidate directly updates the mode frequency.', ...
+        'String', 'Click FRF to fill Mode Frequency, then press Apply.', ...
         'Units', 'normalized', ...
-        'Position', [0.50 0.08 0.45 0.06]);
+        'Position', [0.05 0.095 0.62 0.025]);
 
     txtStatus = uicontrol( ...
-        'Parent', pnlLeft, ...
+        'Parent', pnlMode, ...
         'Style', 'text', ...
         'HorizontalAlignment', 'left', ...
         'String', 'Status: ready', ...
         'Units', 'normalized', ...
-        'Position', [0.03 0.02 0.92 0.04]);
+        'Position', [0.05 0.035 0.90 0.02]);
 
     axFrf = axes( ...
         'Parent', pnlRight, ...
         'Units', 'normalized', ...
-        'Position', [0.08 0.57 0.88 0.37], ...
+        'Position', [0.06 0.56 0.58 0.38], ...
         'ButtonDownFcn', @onFrfAxisClicked);
     title(axFrf, 'Modal FRF Candidate View');
     xlabel(axFrf, 'Frequency (Hz)');
@@ -280,7 +278,7 @@ function view_modal_shape()
     axLayout = axes( ...
         'Parent', pnlRight, ...
         'Units', 'normalized', ...
-        'Position', [0.08 0.09 0.40 0.37]);
+        'Position', [0.06 0.08 0.40 0.40]);
     title(axLayout, 'Point Layout');
     xlabel(axLayout, 'X');
     ylabel(axLayout, 'Y');
@@ -291,7 +289,7 @@ function view_modal_shape()
     axMode = axes( ...
         'Parent', pnlRight, ...
         'Units', 'normalized', ...
-        'Position', [0.56 0.09 0.40 0.37]);
+        'Position', [0.54 0.08 0.40 0.40]);
     title(axMode, 'Mode Shape Preview');
     xlabel(axMode, 'X');
     ylabel(axMode, 'Y');
@@ -299,9 +297,13 @@ function view_modal_shape()
     set(axMode, 'Box', 'on');
     view(axMode, 3);
 
+    applyCompactFonts();
+    layoutModePanel();
+    set(fig, 'ResizeFcn', @onFigureResized);
     refreshAll();
 
     function refreshAll()
+        layoutModePanel();
         refreshFileList();
         refreshPointTable();
         refreshLineTable();
@@ -309,6 +311,98 @@ function view_modal_shape()
         refreshFrfAxis();
         refreshPointAxis();
         refreshModeAxis();
+    end
+
+    function applyCompactFonts()
+        handles = findall(fig);
+        for iHandle = 1:numel(handles)
+            try
+                if isprop(handles(iHandle), 'FontSize')
+                    set(handles(iHandle), 'FontSize', 9);
+                end
+            catch
+            end
+        end
+        try
+            set(tblPoints, 'FontSize', 9);
+        catch
+        end
+        try
+            set(tblLines, 'FontSize', 9);
+        catch
+        end
+        try
+            set([txtModeTitle, edtModeFreq, btnApplyFreq, txtCandidateTitle, ...
+                lstCandidates, btnFindPeaks, btnExtractMode, btnPreview, btnExportGif, ...
+                btnDeletePeak, txtPeakHint, txtStatus], 'FontSize', 8);
+        catch
+        end
+    end
+
+    function onFigureResized(~, ~)
+        layoutModePanel();
+    end
+
+    function layoutModePanel()
+        if ~ishandle(pnlMode)
+            return;
+        end
+
+        oldUnits = get(pnlMode, 'Units');
+        set(pnlMode, 'Units', 'pixels');
+        pnlPos = get(pnlMode, 'Position');
+        set(pnlMode, 'Units', oldUnits);
+
+        panelW = pnlPos(3);
+        panelH = pnlPos(4);
+        pad = 10;
+        titleGap = 22;
+        labelH = 18;
+        fieldH = 26;
+        btnH = 24;
+        gap = 6;
+        statusH = 16;
+
+        contentW = max(120, panelW - 2 * pad);
+        yTop = panelH - titleGap - pad;
+
+        setPixelRect(txtModeTitle, [pad, yTop - labelH, contentW, labelH]);
+        yTop = yTop - labelH - 4;
+
+        editW = max(90, floor(contentW * 0.46));
+        btnW = max(84, min(floor(contentW * 0.36), contentW - editW - gap));
+        setPixelRect(edtModeFreq, [pad, yTop - fieldH, editW, fieldH]);
+        setPixelRect(btnApplyFreq, [pad + editW + gap, yTop - fieldH, btnW, fieldH]);
+        yTop = yTop - fieldH - 8;
+
+        setPixelRect(txtCandidateTitle, [pad, yTop - labelH, contentW, labelH]);
+        yTop = yTop - labelH - 4;
+
+        statusY = 4;
+        row2Y = statusY + statusH + 4;
+        row1Y = row2Y + btnH + 4;
+        listY = row1Y + btnH + 8;
+        listH = max(70, yTop - listY);
+        setPixelRect(lstCandidates, [pad, listY, contentW, listH]);
+
+        colW = floor((contentW - 2 * gap) / 3);
+        setPixelRect(btnFindPeaks, [pad, row1Y, colW, btnH]);
+        setPixelRect(btnExtractMode, [pad + colW + gap, row1Y, colW, btnH]);
+        setPixelRect(btnPreview, [pad + 2 * (colW + gap), row1Y, colW, btnH]);
+
+        halfW = floor((contentW - gap) / 2);
+        setPixelRect(btnExportGif, [pad, row2Y, halfW, btnH]);
+        setPixelRect(btnDeletePeak, [pad + halfW + gap, row2Y, halfW, btnH]);
+
+        set(txtPeakHint, 'Visible', 'off');
+        setPixelRect(txtStatus, [pad, statusY, contentW, statusH]);
+    end
+
+    function setPixelRect(h, rect)
+        if ~ishandle(h)
+            return;
+        end
+        set(h, 'Units', 'pixels', 'Position', rect);
     end
 
     function onLoadFiles(~, ~)
@@ -539,7 +633,7 @@ function view_modal_shape()
     function onApplyFreq(~, ~)
         ok = syncActiveFreqFromEdit(true, false);
         if ok
-            refreshFrfAxis();
+            return;
         end
     end
 
@@ -574,16 +668,9 @@ function view_modal_shape()
             freqVal = snapFrequencyToCurve(freqVal, app.currentFrf.freq);
         end
         addManualPeak(freqVal);
-        applyActiveModeFreq(freqVal, 'manual/apply');
+        refreshCandidateList(app.currentFrf.peaks);
+        selectCandidateByFrequency(freqVal, 'manual/apply', showStatus);
         ok = true;
-        if showStatus
-            if ~isempty(app.currentFrf.freq)
-                freqSnap = snapFrequencyToCurve(freqVal, app.currentFrf.freq);
-                updateStatus(sprintf('Applied requested frequency %.8g Hz. Nearest FRF point is %.8g Hz.', freqVal, freqSnap));
-            else
-                updateStatus(sprintf('Applied requested frequency %.8g Hz.', freqVal));
-            end
-        end
     end
 
     function onModeFreqEdited(src, ~)
@@ -592,7 +679,7 @@ function view_modal_shape()
             updateStatus('Mode Freq must be a positive number.');
             return;
         end
-        updateStatus(sprintf('Mode Freq edited to %.8g Hz. Press Apply Freq or Extract/Preview to use it.', freqVal));
+        updateStatus(sprintf('Mode Freq edited to %.8g Hz. Press Apply Freq to add/select it.', freqVal));
     end
 
     function onFindPeaks(~, ~)
@@ -629,8 +716,7 @@ function view_modal_shape()
         if idx < 1 || idx > numel(freqs)
             return;
         end
-        applyActiveModeFreq(freqs(idx), 'candidate list');
-        updateStatus(sprintf('Candidate %.8g Hz is now current.', freqs(idx)));
+        selectCandidateByFrequency(freqs(idx), 'candidate list', true);
     end
 
     function onDeleteSelectedPeak(~, ~)
@@ -658,12 +744,9 @@ function view_modal_shape()
             updateStatus('Selected candidate is invalid.');
             return;
         end
-        if isfinite(app.activeModeFreq) && abs(app.activeModeFreq - freqs(idx)) <= max(1e-9, 1e-6 * max(1, abs(freqs(idx))))
-            updateStatus('Cannot delete the current frequency. Select another frequency first.');
-            return;
-        end
         freqToDelete = freqs(idx);
         tol = max(1e-9, 1e-6 * max(1, abs(freqToDelete)));
+        deletingCurrent = isfinite(app.activeModeFreq) && abs(app.activeModeFreq - freqToDelete) <= tol;
         deleted = false;
         if ~isempty(strfind(label, '[Manual]')) %#ok<STREMP>
             if ~isempty(app.manualPeaks)
@@ -686,6 +769,21 @@ function view_modal_shape()
             return;
         end
         refreshCandidateList(app.currentFrf.peaks);
+        remainingFreqs = app.currentFrf.displayFreqs;
+        if deletingCurrent
+            if isempty(remainingFreqs)
+                app.activeModeFreq = NaN;
+                app.lastMode = [];
+                updateFreqSummary(NaN);
+                refreshFrfAxis();
+                refreshModeAxis();
+                updateStatus(sprintf('Deleted candidate %.8g Hz. No candidate remains.', freqToDelete));
+                return;
+            end
+            fallbackIdx = min(max(idx, 1), numel(remainingFreqs));
+            selectCandidateByFrequency(remainingFreqs(fallbackIdx), 'candidate fallback', true);
+            return;
+        end
         refreshFrfAxis();
         updateStatus(sprintf('Deleted peak candidate %.8g Hz.', freqToDelete));
     end
@@ -701,11 +799,10 @@ function view_modal_shape()
             app.currentFrf.db = dbCurve;
         end
         freqVal = snapFrequencyToCurve(freqVal, app.currentFrf.freq);
-        addManualPeak(freqVal);
-        applyActiveModeFreq(freqVal, 'FRF click');
-        refreshCandidateList(app.currentFrf.peaks);
+        set(edtModeFreq, 'String', sprintf('%.8g', freqVal));
+        app.currentFrf.pickedFreq = freqVal;
         refreshFrfAxis();
-        updateStatus(sprintf('Added manual candidate %.8g Hz from FRF view and set it as current.', freqVal));
+        updateStatus(sprintf('Picked %.8g Hz from FRF. Press Apply Freq to add it.', freqVal));
     end
 
     function freqVal = getClickedFrequency()
@@ -729,7 +826,6 @@ function view_modal_shape()
     end
 
     function onExtractMode(~, ~)
-        syncActiveFreqFromEdit(false, false);
         mode = ensureModeExtracted();
         if isempty(mode)
             return;
@@ -740,7 +836,6 @@ function view_modal_shape()
     end
 
     function onPreviewMode(~, ~)
-        syncActiveFreqFromEdit(false, false);
         mode = ensureModeExtracted();
         if isempty(mode)
             return;
@@ -751,7 +846,6 @@ function view_modal_shape()
     end
 
     function onExportGif(~, ~)
-        syncActiveFreqFromEdit(false, false);
         mode = ensureModeExtracted();
         if isempty(mode)
             return;
@@ -773,7 +867,7 @@ function view_modal_shape()
     function mode = ensureModeExtracted()
         mode = [];
         if ~isfinite(app.activeModeFreq) || app.activeModeFreq <= 0
-            updateStatus('Set a current mode frequency first.');
+            updateStatus('Select a candidate frequency first.');
             return;
         end
         if ~isempty(app.lastMode) && abs(app.lastMode.requestedFreq - app.activeModeFreq) <= max(1e-9, 1e-6 * app.activeModeFreq)
@@ -903,6 +997,15 @@ function view_modal_shape()
         if nargin < 1
             peakFreqs = app.currentFrf.peaks;
         end
+        prevFreqs = app.currentFrf.displayFreqs;
+        prevValue = get(lstCandidates, 'Value');
+        selectedFreq = NaN;
+        if ~isempty(prevFreqs) && prevValue >= 1 && prevValue <= numel(prevFreqs)
+            selectedFreq = prevFreqs(prevValue);
+        end
+        if isfinite(app.activeModeFreq) && app.activeModeFreq > 0
+            selectedFreq = app.activeModeFreq;
+        end
         displayFreqs = [];
         items = {};
         for i = 1:numel(app.manualPeaks)
@@ -926,15 +1029,14 @@ function view_modal_shape()
             set(lstCandidates, 'String', {'(none)'}, 'Value', 1);
             return;
         end
-        valueIdx = 1;
-        if isfinite(app.activeModeFreq) && app.activeModeFreq > 0
-            tol = max(1e-9, 1e-6 * max(1, abs(app.activeModeFreq)));
-            idxMatch = find(abs(displayFreqs - app.activeModeFreq) <= tol, 1, 'first');
-            if ~isempty(idxMatch)
-                valueIdx = idxMatch;
+        selIdx = 1;
+        if isfinite(selectedFreq)
+            [foundIdx, found] = findMatchingFrequencyIndex(displayFreqs, selectedFreq);
+            if found
+                selIdx = foundIdx;
             end
         end
-        set(lstCandidates, 'String', items, 'Value', valueIdx);
+        set(lstCandidates, 'String', items, 'Value', selIdx);
     end
 
     function refreshFrfAxis()
@@ -956,6 +1058,17 @@ function view_modal_shape()
             set(axFrf, 'XScale', 'log', 'YGrid', 'on', 'XGrid', 'on');
             return;
         end
+        validX = freq(isfinite(freq) & freq > 0);
+        if isempty(validX)
+            validX = [0.1; 1];
+        end
+        xRange = [min(validX(:)), max(validX(:))];
+        if xRange(2) <= xRange(1)
+            xRange = xRange .* [0.9, 1.1];
+            if xRange(1) <= 0
+                xRange(1) = max(xRange(2) / 10, eps);
+            end
+        end
 
         hMain = semilogx(axFrf, freq, dbCurve, 'Color', [0 0.447 0.741], 'LineWidth', 1.2);
         set(hMain, 'ButtonDownFcn', @onFrfAxisClicked);
@@ -969,6 +1082,27 @@ function view_modal_shape()
             peakDb = interp1(freq, dbCurve, peakFreqs, 'linear', 'extrap');
             hPeak = semilogx(axFrf, peakFreqs, peakDb, 'ro', 'MarkerFaceColor', 'w', 'LineStyle', 'none', 'MarkerSize', 6, 'LineWidth', 1.0);
             set(hPeak, 'ButtonDownFcn', @onFrfAxisClicked);
+        end
+        if isfinite(app.currentFrf.pickedFreq) && app.currentFrf.pickedFreq > 0 && ...
+                (~isfinite(app.activeModeFreq) || abs(app.currentFrf.pickedFreq - app.activeModeFreq) > max(1e-9, 1e-6 * max(1, abs(app.currentFrf.pickedFreq))))
+            ylPick = [min(dbCurve(:)), max(dbCurve(:))];
+            if diff(ylPick) < 1e-6
+                ylPick = ylPick + [-1, 1];
+            else
+                padPick = 0.08 * diff(ylPick);
+                ylPick = ylPick + [-padPick, padPick];
+            end
+            pickedFreqPlot = snapFrequencyToCurve(app.currentFrf.pickedFreq, freq);
+            pickedDb = interp1(freq, dbCurve, pickedFreqPlot, 'linear', 'extrap');
+            hPendingLine = semilogx(axFrf, [pickedFreqPlot pickedFreqPlot], ylPick, '--', 'Color', [0 0.6 0], 'LineWidth', 1.2);
+            set(hPendingLine, 'ButtonDownFcn', @onFrfAxisClicked);
+            hPending = semilogx(axFrf, pickedFreqPlot, pickedDb, 's', ...
+                'Color', [0 0.6 0], ...
+                'MarkerFaceColor', [0.65 0.95 0.65], ...
+                'MarkerSize', 7, ...
+                'LineWidth', 1.2, ...
+                'LineStyle', 'none');
+            set(hPending, 'ButtonDownFcn', @onFrfAxisClicked);
         end
         if isfinite(app.activeModeFreq) && app.activeModeFreq > 0
             yl = [min(dbCurve(:)), max(dbCurve(:))];
@@ -996,11 +1130,12 @@ function view_modal_shape()
         end
         hold(axFrf, 'off');
         set(axFrf, 'ButtonDownFcn', @onFrfAxisClicked, 'XScale', 'log', 'Box', 'on');
+        xlim(axFrf, xRange);
         grid(axFrf, 'on');
         xlabel(axFrf, 'Frequency (Hz)');
         ylabel(axFrf, 'Magnitude (dB)');
         if isfinite(app.activeModeFreq) && app.activeModeFreq > 0
-            title(axFrf, sprintf('Modal FRF Candidate View - Current %.8g Hz', app.activeModeFreq));
+            title(axFrf, sprintf('Modal FRF Candidate View - Selected %.8g Hz', app.activeModeFreq));
         else
             title(axFrf, 'Modal FRF Candidate View');
         end
@@ -1277,38 +1412,44 @@ function view_modal_shape()
         end
     end
 
-    function applyActiveModeFreq(freqVal, sourceLabel)
+    function applyActiveModeFreq(freqVal, ~)
         if ~isfinite(freqVal) || freqVal <= 0
             return;
         end
-        preservePreviousActiveCandidate(freqVal);
         app.activeModeFreq = freqVal;
-        if ~isempty(app.manualPeaks)
-            tol = max(1e-9, 1e-6 * max(1, abs(freqVal)));
-            app.manualPeaks = app.manualPeaks(abs(app.manualPeaks - freqVal) > tol);
-        end
         set(edtModeFreq, 'String', sprintf('%.8g', freqVal));
         updateFreqSummary(NaN);
         app.currentFrf.pickedFreq = freqVal;
         app.lastMode = [];
         refreshCandidateList(app.currentFrf.peaks);
         refreshFrfAxis();
+    end
+
+    function selectCandidateByFrequency(freqVal, sourceLabel, showStatus)
+        if nargin < 3
+            showStatus = true;
+        end
+        if ~isfinite(freqVal) || freqVal <= 0
+            return;
+        end
+        applyActiveModeFreq(freqVal, sourceLabel);
+        mode = ensureModeExtracted();
+        if isempty(mode)
+            refreshModeAxis();
+            if showStatus
+                updateStatus(sprintf('Selected candidate %.8g Hz but mode extraction failed.', freqVal));
+            end
+            return;
+        end
+        updateFreqSummary(mode.actualFreq);
         refreshModeAxis();
-        updateStatus(sprintf('Current frequency updated to %.8g Hz (%s).', freqVal, sourceLabel));
+        if showStatus
+            updateStatus(sprintf('Loaded candidate %.8g Hz (actual %.8g Hz).', freqVal, mode.actualFreq));
+        end
     end
 
     function updateFreqSummary(actualFreq)
-        if isfinite(app.activeModeFreq) && app.activeModeFreq > 0
-            currentText = sprintf('%.8g', app.activeModeFreq);
-        else
-            currentText = '-';
-        end
-        if nargin < 1 || ~isfinite(actualFreq) || actualFreq <= 0
-            actualText = '-';
-        else
-            actualText = sprintf('%.8g', actualFreq);
-        end
-        set(txtActiveFreq, 'String', sprintf('Current: %s | Actual: %s', currentText, actualText));
+        %#ok<INUSD>
     end
 
     function addManualPeak(freqVal)
@@ -1324,28 +1465,19 @@ function view_modal_shape()
         app.manualPeaks = sort(app.manualPeaks);
     end
 
-    function preservePreviousActiveCandidate(newFreq)
-        oldFreq = app.activeModeFreq;
-        if ~isfinite(oldFreq) || oldFreq <= 0
+    function [idxOut, found] = findMatchingFrequencyIndex(freqList, freqVal)
+        idxOut = 1;
+        found = false;
+        if isempty(freqList) || ~isfinite(freqVal)
             return;
         end
-        tol = max(1e-9, 1e-6 * max([1, abs(oldFreq), abs(newFreq)]));
-        if abs(oldFreq - newFreq) <= tol
+        tol = max(1e-9, 1e-6 * max([1; abs(freqList(:)); abs(freqVal)]));
+        idx = find(abs(freqList(:) - freqVal) <= tol, 1, 'first');
+        if isempty(idx)
             return;
         end
-        if ~isempty(app.currentFrf.peaks)
-            autoPeaks = app.currentFrf.peaks(:);
-            if any(abs(autoPeaks - oldFreq) <= tol)
-                return;
-            end
-        end
-        if ~isempty(app.manualPeaks)
-            if any(abs(app.manualPeaks(:) - oldFreq) <= tol)
-                return;
-            end
-        end
-        app.manualPeaks(end + 1) = oldFreq; %#ok<AGROW>
-        app.manualPeaks = sort(app.manualPeaks);
+        idxOut = idx;
+        found = true;
     end
 
     function invalidateModeState()

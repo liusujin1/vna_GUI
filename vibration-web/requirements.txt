@@ -1,0 +1,10 @@
+dash>=2.14
+plotly>=5.18
+numpy>=1.24
+scipy>=1.11
+pandas>=2.0
+openpyxl>=3.1
+gunicorn>=21.2
+pywebview>=5.1
+pyinstaller>=6.0
+waitress>=3.0

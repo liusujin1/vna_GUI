@@ -1,0 +1,23 @@
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #fff;
+}
+
+details summary {
+    padding: 4px 0;
+    user-select: none;
+}
+
+details summary:hover {
+    color: #1976D2;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+.dash-graph .modebar {
+    top: 0 !important;
+    right: 0 !important;
+}

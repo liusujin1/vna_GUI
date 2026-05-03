@@ -1,12 +1,13 @@
-ï»¿function view_modal_shape()
-%VIEW_MODAL_SHAPE æå–æ¨¡æ€æŒ¯å‹å¹¶å¯¼å‡ºåŠ¨ç”»ã€‚
-% ç‹¬ç«‹äºç°æœ‰æŒ¯åŠ¨ GUIï¼Œé¢å‘ .vna æ¨¡æ€æµ‹è¯•æ•°æ®ã€‚
-% ä¸»è¦åŠŸèƒ½ï¼š
-% 1. åŠ è½½å•ä¸ªæ–‡ä»¶æˆ–æ•´ä¸ªæ–‡ä»¶å¤¹å†…çš„ .vna æ–‡ä»¶ã€‚
-% 2. ç”¨è¡¨æ ¼ç®¡ç†æµ‹ç‚¹ã€ä¸‰æ–¹å‘é€šé“å’Œç©ºé—´åæ ‡ã€‚
-% 3. è‡ªåŠ¨æ¨æ–­æµ‹ç‚¹éª¨æ¶è¿çº¿ï¼Œå¹¶å…è®¸æ‰‹å·¥ä¿®æ­£ã€‚
-% 4. åŸºäºå¤æ•° FRF æå–ç›®æ ‡é¢‘ç‡ä¸‹çš„å·¥ç¨‹æŒ¯å‹ã€‚
-% 5. é¢„è§ˆéª¨æ¶æŒ¯å‹å¹¶å¯¼å‡º GIF åŠ¨ç”»ã€‚
+function view_modal_shape()
+%VIEW_MODAL_SHAPE ÌáÈ¡Ä£Ì¬ÕñĞÍ²¢µ¼³ö¶¯»­¡£
+% ¶ÀÁ¢ÓÚÏÖÓĞÕñ¶¯ GUI£¬ÃæÏò .vna Ä£Ì¬²âÊÔÊı¾İ¡£
+% Ö÷Òª¹¦ÄÜ£º
+% 1. ¼ÓÔØµ¥¸öÎÄ¼ş»òÕû¸öÎÄ¼ş¼ĞÄÚµÄ .vna ÎÄ¼ş¡£
+% 2. ÓÃ±í¸ñ¹ÜÀí²âµã¡¢Èı·½ÏòÍ¨µÀºÍ¿Õ¼ä×ø±ê¡£
+% 3. ×Ô¶¯ÍÆ¶Ï²âµã¹Ç¼ÜÁ¬Ïß£¬²¢ÔÊĞíÊÖ¹¤ĞŞÕı¡£
+% 4. »ùÓÚ¸´Êı FRF ÌáÈ¡Ä¿±êÆµÂÊÏÂµÄ¹¤³ÌÕñĞÍ¡£
+% 5. Ô¤ÀÀ¹Ç¼ÜÕñĞÍ²¢µ¼³ö GIF ¶¯»­¡£
+    % Ó¦ÓÃ×´Ì¬¼¯ÖĞ±£´æÔÚ app ÖĞ£¬¹©ËùÓĞ»Øµ÷¹²Ïíµ±Ç°Êı¾İÓë½çÃæ×´Ì¬¡£
     app = struct();
     app.files = struct('name', {}, 'path', {}, 'freq', {}, 'xcmeas', {}, 'eu', {}, 'coh', {}, 'nResp', {});
     app.points = defaultPointRows();
@@ -21,9 +22,11 @@
     app.selectedFiles = [];
     app.previewTimer = [];
     app.previewPhaseIndex = 0;
+    app.isLegacyMatlab = isLegacyMatlabRelease();
 
+    % Ö÷´°¿ÚÓë×óÓÒÁ½´óÃæ°å£º×ó²à¸ºÔğÊı¾İ±à¼­£¬ÓÒ²à¸ºÔğ FRF ÓëÕñĞÍÔ¤ÀÀ¡£
     fig = figure( ...
-        'Name', 'Modal Shape Viewer', ...
+        'Name', 'Ä£Ì¬ÕñĞÍ²é¿´Æ÷', ...
         'NumberTitle', 'off', ...
         'MenuBar', 'none', ...
         'ToolBar', 'none', ...
@@ -34,26 +37,27 @@
 
     pnlLeft = uipanel( ...
         'Parent', fig, ...
-        'Title', 'Controls', ...
+        'Title', '¿ØÖÆÇø', ...
         'Units', 'normalized', ...
         'Position', [0.01 0.01 0.34 0.98]);
 
     pnlRight = uipanel( ...
         'Parent', fig, ...
-        'Title', 'Preview', ...
+        'Title', 'Ô¤ÀÀÇø', ...
         'Units', 'normalized', ...
         'Position', [0.36 0.01 0.63 0.98]);
 
     pnlMode = uipanel( ...
         'Parent', pnlRight, ...
-        'Title', 'Mode', ...
+        'Title', 'ÆµÂÊÇø', ...
         'Units', 'normalized', ...
         'Position', [0.67 0.56 0.29 0.38]);
 
+    % ÎÄ¼şÇø£ºÖ§³Ö°´ÎÄ¼ş»ò°´ÎÄ¼ş¼ĞÅúÁ¿¶ÁÈ¡ .vna Êı¾İ¡£
     btnLoadFiles = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Load Files', ...
+        'String', '¼ÓÔØÎÄ¼ş', ...
         'Units', 'normalized', ...
         'Position', [0.03 0.95 0.22 0.04], ...
         'Callback', @onLoadFiles); %#ok<NASGU>
@@ -61,7 +65,7 @@
     btnLoadFolder = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Load Folder', ...
+        'String', '¼ÓÔØÎÄ¼ş¼Ğ', ...
         'Units', 'normalized', ...
         'Position', [0.27 0.95 0.22 0.04], ...
         'Callback', @onLoadFolder); %#ok<NASGU>
@@ -69,7 +73,7 @@
     btnDeleteFiles = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Delete Files', ...
+        'String', 'É¾³ıÎÄ¼ş', ...
         'Units', 'normalized', ...
         'Position', [0.51 0.95 0.44 0.04], ...
         'Callback', @onDeleteFiles); %#ok<NASGU>
@@ -81,7 +85,7 @@
         'Position', [0.03 0.82 0.92 0.11], ...
         'Min', 0, ...
         'Max', 20, ...
-        'String', {'No file loaded'}, ...
+        'String', {'Î´¼ÓÔØÎÄ¼ş'}, ...
         'Value', 1, ...
         'Callback', @onFileSelectionChanged);
 
@@ -91,12 +95,12 @@
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
         'Position', [0.03 0.805 0.92 0.018], ...
-        'String', 'Point table binds each PointID directly to a loaded file name.'); %#ok<NASGU>
+        'String', '²âµã±íÖĞµÄÃ¿¸ö PointID ĞĞ¿ÉÖ±½Ó°ó¶¨µ½Ò»¸öÒÑ¼ÓÔØÎÄ¼ş¡£'); %#ok<NASGU>
 
     txtPointTitle = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'text', ...
-        'String', 'Point Table', ...
+        'String', '²âµã±í', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
         'Position', [0.03 0.775 0.40 0.022]); %#ok<NASGU>
@@ -104,7 +108,7 @@
     btnAddPoint = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Add Point', ...
+        'String', 'ĞÂÔö²âµã', ...
         'Units', 'normalized', ...
         'Position', [0.62 0.784 0.15 0.028], ...
         'Callback', @onAddPointRow); %#ok<NASGU>
@@ -112,11 +116,12 @@
     btnDeletePoint = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Del Point', ...
+        'String', 'É¾³ı²âµã', ...
         'Units', 'normalized', ...
         'Position', [0.79 0.784 0.16 0.028], ...
         'Callback', @onDeletePointRows); %#ok<NASGU>
 
+    % ²âµã±í£ºÃ¿ĞĞÃèÊöÒ»¸ö¡°²âµã-ÎÄ¼ş-Èı·½ÏòÍ¨µÀ-¿Õ¼ä×ø±ê¡±µÄ°ó¶¨¹ØÏµ¡£
     tblPoints = uitable( ...
         'Parent', pnlLeft, ...
         'Units', 'normalized', ...
@@ -131,7 +136,7 @@
     txtLineTitle = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'text', ...
-        'String', 'Line Table', ...
+        'String', 'Á¬Ïß±í', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
         'Position', [0.03 0.40 0.36 0.020]); %#ok<NASGU>
@@ -139,7 +144,7 @@
     btnAutoLines = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Auto Lines', ...
+        'String', '×Ô¶¯Á¬Ïß', ...
         'Units', 'normalized', ...
         'Position', [0.42 0.40 0.22 0.026], ...
         'Callback', @onAutoBuildLines); %#ok<NASGU>
@@ -147,7 +152,7 @@
     btnAddLine = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Add Line', ...
+        'String', 'ĞÂÔöÁ¬Ïß', ...
         'Units', 'normalized', ...
         'Position', [0.66 0.40 0.13 0.026], ...
         'Callback', @onAddLineRow); %#ok<NASGU>
@@ -155,11 +160,12 @@
     btnDeleteLine = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
-        'String', 'Del Line', ...
+        'String', 'É¾³ıÁ¬Ïß', ...
         'Units', 'normalized', ...
         'Position', [0.81 0.40 0.14 0.026], ...
         'Callback', @onDeleteLineRows); %#ok<NASGU>
 
+    % Á¬Ïß±í£º¶¨Òå¹Ç¼ÜÍØÆË£¬¹©¾²Ì¬Í¼¡¢¶¯»­Í¼ºÍ GIF ¹²ÓÃ¡£
     tblLines = uitable( ...
         'Parent', pnlLeft, ...
         'Units', 'normalized', ...
@@ -170,10 +176,11 @@
         'CellEditCallback', @onLineTableEdited, ...
         'CellSelectionCallback', @onLineTableSelected);
 
+    % Ä£Ì¬ÆµÂÊÇø£ºÊäÈëÆµÂÊ¡¢¹ÜÀíºòÑ¡ÆµÂÊ²¢Çı¶¯ÕñĞÍÌáÈ¡¡£
     txtModeTitle = uicontrol( ...
         'Parent', pnlMode, ...
         'Style', 'text', ...
-        'String', 'Mode Frequency', ...
+        'String', 'Ä£Ì¬ÆµÂÊ', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
         'Position', [0.05 0.95 0.40 0.03]);
@@ -189,7 +196,7 @@
     btnApplyFreq = uicontrol( ...
         'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
-        'String', 'Apply Freq', ...
+        'String', 'Ó¦ÓÃÆµÂÊ', ...
         'Units', 'normalized', ...
         'Position', [0.45 0.875 0.28 0.05], ...
         'Callback', @onApplyFreq);
@@ -197,7 +204,7 @@
     btnFindPeaks = uicontrol( ...
         'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
-        'String', 'Find Peaks', ...
+        'String', '×Ô¶¯ÕÒ·å', ...
         'Units', 'normalized', ...
         'Position', [0.05 0.18 0.21 0.035], ...
         'Callback', @onFindPeaks);
@@ -205,7 +212,7 @@
     btnExtractMode = uicontrol( ...
         'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
-        'String', 'Extract', ...
+        'String', 'ÌáÈ¡ÕñĞÍ', ...
         'Units', 'normalized', ...
         'Position', [0.29 0.18 0.18 0.035], ...
         'Callback', @onExtractMode);
@@ -213,7 +220,7 @@
     btnPreview = uicontrol( ...
         'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
-        'String', 'Preview', ...
+        'String', '¶¯»­Ô¤ÀÀ', ...
         'Units', 'normalized', ...
         'Position', [0.50 0.18 0.18 0.035], ...
         'Callback', @onPreviewMode);
@@ -221,7 +228,7 @@
     btnExportGif = uicontrol( ...
         'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
-        'String', 'Export GIF', ...
+        'String', 'µ¼³ö GIF', ...
         'Units', 'normalized', ...
         'Position', [0.71 0.18 0.24 0.035], ...
         'Callback', @onExportGif);
@@ -229,7 +236,7 @@
     txtCandidateTitle = uicontrol( ...
         'Parent', pnlMode, ...
         'Style', 'text', ...
-        'String', 'Mode Candidates', ...
+        'String', 'ÆµÂÊºòÑ¡', ...
         'HorizontalAlignment', 'left', ...
         'Units', 'normalized', ...
         'Position', [0.05 0.80 0.45 0.025]);
@@ -239,14 +246,14 @@
         'Style', 'listbox', ...
         'Units', 'normalized', ...
         'Position', [0.05 0.34 0.90 0.44], ...
-        'String', {'(none)'}, ...
+        'String', {'(¿Õ)'}, ...
         'Value', 1, ...
         'Callback', @onCandidateSelected);
 
     btnDeletePeak = uicontrol( ...
         'Parent', pnlMode, ...
         'Style', 'pushbutton', ...
-        'String', 'Del Peak', ...
+        'String', 'É¾³ıºòÑ¡', ...
         'Units', 'normalized', ...
         'Position', [0.71 0.135 0.24 0.03], ...
         'Callback', @onDeleteSelectedPeak);
@@ -255,7 +262,7 @@
         'Parent', pnlMode, ...
         'Style', 'text', ...
         'HorizontalAlignment', 'left', ...
-        'String', 'Click FRF to fill Mode Frequency, then press Apply.', ...
+        'String', 'ÏÈÔÚ FRF Í¼ÉÏµãÆµÂÊ£¬ÔÙµã¡°Ó¦ÓÃÆµÂÊ¡±¼ÓÈëºòÑ¡¡£', ...
         'Units', 'normalized', ...
         'Position', [0.05 0.095 0.62 0.025]);
 
@@ -263,18 +270,19 @@
         'Parent', pnlMode, ...
         'Style', 'text', ...
         'HorizontalAlignment', 'left', ...
-        'String', 'Status: ready', ...
+        'String', '×´Ì¬: ¾ÍĞ÷', ...
         'Units', 'normalized', ...
         'Position', [0.05 0.035 0.90 0.02]);
 
+    % ÓÒ²àÈı¿éÍ¼´°£ºFRF ºòÑ¡Í¼¡¢²âµã¹Ç¼ÜÍ¼¡¢ÕñĞÍÔ¤ÀÀÍ¼¡£
     axFrf = axes( ...
         'Parent', pnlRight, ...
         'Units', 'normalized', ...
         'Position', [0.06 0.56 0.58 0.38], ...
         'ButtonDownFcn', @onFrfAxisClicked);
-    title(axFrf, 'Modal FRF Candidate View');
-    xlabel(axFrf, 'Frequency (Hz)');
-    ylabel(axFrf, 'Magnitude (dB)');
+    title(axFrf, 'Ä£Ì¬ FRF ºòÑ¡Í¼');
+    xlabel(axFrf, 'ÆµÂÊ (Hz)');
+    ylabel(axFrf, '·ùÖµ (dB)');
     set(axFrf, 'XScale', 'log', 'Box', 'on');
     grid(axFrf, 'on');
 
@@ -282,7 +290,7 @@
         'Parent', pnlRight, ...
         'Units', 'normalized', ...
         'Position', [0.06 0.08 0.40 0.40]);
-    title(axLayout, 'Point Layout');
+    title(axLayout, '²âµã¹Ç¼ÜÍ¼');
     xlabel(axLayout, 'X');
     ylabel(axLayout, 'Y');
     zlabel(axLayout, 'Z');
@@ -293,7 +301,7 @@
         'Parent', pnlRight, ...
         'Units', 'normalized', ...
         'Position', [0.54 0.08 0.40 0.40]);
-    title(axMode, 'Mode Shape Preview');
+    title(axMode, 'ÕñĞÍÔ¤ÀÀ');
     xlabel(axMode, 'X');
     ylabel(axMode, 'Y');
     zlabel(axMode, 'Z');
@@ -302,10 +310,11 @@
 
     applyCompactFonts();
     layoutModePanel();
-    rotate3d(fig, 'on');
+    enableFigureRotate3d(fig);
     set(fig, 'ResizeFcn', @onFigureResized);
     refreshAll();
 
+    % È«Á¿Ë¢ĞÂÈë¿Ú£ºÔÚÎÄ¼ş¡¢²âµã¡¢Á¬Ïß±ä»¯ºóÍ³Ò»ÖØ»æËùÓĞÇøÓò¡£
     function refreshAll()
         layoutModePanel();
         refreshFileList();
@@ -347,6 +356,7 @@
         layoutModePanel();
     end
 
+    % Mode Ãæ°å²ÉÓÃÏñËØ¼¶ÖØÅÅ£¬¼õÉÙ¾É°æ MATLAB ÏÂµÄÎÄ×Ö²ÃÇĞÓë´íÎ»¡£
     function layoutModePanel()
         if ~ishandle(pnlMode)
             return;
@@ -409,6 +419,7 @@
         set(h, 'Units', 'pixels', 'Position', rect);
     end
 
+    % ´ÓÉÏ´ÎÄ¿Â¼¼ÌĞøÑ¡Ôñ¶à¸ö .vna ÎÄ¼ş¡£
     function onLoadFiles(~, ~)
         startDir = getValidStartDir();
         [files, folder] = uigetfile({'*.vna', 'VNA Files (*.vna)'}, 'Load VNA Files', startDir, 'MultiSelect', 'on');
@@ -441,6 +452,7 @@
         addFilesFromPaths(filePaths);
     end
 
+    % Öğ¸ö½âÎöÎÄ¼ş²¢¼ÓÈëµ±Ç°»á»°£»ÖØ¸´ÎÄ¼ş°´Ãû³ÆÌø¹ı¡£
     function addFilesFromPaths(filePaths)
         added = 0;
         messages = {};
@@ -490,6 +502,7 @@
         end
     end
 
+    % É¾³ıÑ¡ÖĞÎÄ¼ş£¬²¢Í¬²½ÇåÀíÏà¹Ø²âµã¡¢FRF »º´æºÍÕñĞÍ×´Ì¬¡£
     function onDeleteFiles(~, ~)
         if isempty(app.files)
             return;
@@ -519,6 +532,7 @@
         app.selectedFiles = get(lstFiles, 'Value');
     end
 
+    % ×·¼ÓÒ»¸öĞÂµÄ²âµãĞĞ£¬Ä¬ÈÏ¼Ì³Ğµ±Ç°Ñ¡ÖĞÎÄ¼şÃû£¬±ãÓÚ¿ìËÙÂ¼Èë¡£
     function onAddPointRow(~, ~)
         app.points = parsePointTableData(get(tblPoints, 'Data'));
         newRow = defaultPointRow();
@@ -539,6 +553,7 @@
         updateStatus('Added point row.');
     end
 
+    % É¾³ıÑ¡ÖĞµÄ²âµãĞĞ£»ÈôÃ»ÓĞÏÔÊ½Ñ¡ÖĞ£¬Ôò°´µ±Ç°±í¸ñ×´Ì¬¶µµ×É¾³ı¡£
     function onDeletePointRows(~, ~)
         app.points = parsePointTableData(get(tblPoints, 'Data'));
         rows = unique(app.selectedPointRows);
@@ -575,6 +590,7 @@
         updateStatus(sprintf('Deleted %d point row(s).', numel(rows)));
     end
 
+    % ²âµã±íÒ»µ©ĞŞ¸Ä£¬ĞèÒªÍ¬²½ÖØ½¨×Ô¶¯Á¬Ïß¡¢FRF »º´æºÍÔ¤ÀÀ½á¹û¡£
     function onPointTableEdited(~, ~)
         app.points = parsePointTableData(get(tblPoints, 'Data'));
         app.lines = removeInvalidLines(app.lines, app.points);
@@ -639,6 +655,7 @@
         app.selectedLineRows = selectionRows(event);
     end
 
+    % ¸ù¾İ²âµã¿Õ¼äÎ»ÖÃ×Ô¶¯ÍÆ¶ÏÒ»°æ¹Ç¼ÜÁ¬Ïß£¬¹©ºóĞøÈË¹¤ĞŞÕı¡£
     function onAutoBuildLines(~, ~)
         app.points = parsePointTableData(get(tblPoints, 'Data'));
         autoLines = inferAutoLines(app.points);
@@ -649,6 +666,7 @@
         updateStatus(sprintf('Auto-built %d line(s).', numel(autoLines)));
     end
 
+    % ½«ÊäÈë¿òÖĞµÄÆµÂÊ¼ÓÈëºòÑ¡ÁĞ±í£¬²¢Á¢¿ÌÇĞ»»µ½¸ÃºòÑ¡×ö¾²Ì¬ÌáÈ¡¡£
     function onApplyFreq(~, ~)
         ok = syncActiveFreqFromEdit(true, false);
         if ok
@@ -701,6 +719,7 @@
         updateStatus(sprintf('Mode Freq edited to %.8g Hz. Press Apply Freq to add/select it.', freqVal));
     end
 
+    % ×Ô¶¯ÕÒ·å£º×ÛºÏ FRF ÎªÖ÷£¬Í¬Ê±²¹Èë¸÷²âµã/¸÷·½ÏòµÄ¾Ö²¿Ä£Ì¬·åÖµ¡£
     function onFindPeaks(~, ~)
         stopPreviewAnimation(true, true);
         [freq, dbCurve] = buildAggregateFrfCurve();
@@ -729,6 +748,7 @@
         end
     end
 
+    % ºòÑ¡ÁĞ±íÊÇÖ÷Çı¶¯Èë¿Ú£ºÑ¡ÖĞÄÄ¸öÆµÂÊ£¬¾ÍÇĞµ½ÄÄ¸öÆµÂÊµÄ¾²Ì¬ÕñĞÍ¡£
     function onCandidateSelected(src, ~)
         freqs = app.currentFrf.displayFreqs;
         if isempty(freqs)
@@ -757,7 +777,7 @@
         else
             label = labels;
         end
-        if strcmp(label, '(none)')
+        if strcmp(label, '(¿Õ)')
             updateStatus('No candidate available to delete.');
             return;
         end
@@ -810,6 +830,7 @@
         updateStatus(sprintf('Deleted peak candidate %.8g Hz.', freqToDelete));
     end
 
+    % ÔÚ FRF Í¼ÉÏµãÑ¡ÆµÂÊÊ±£¬Ö»»ØÌîÊäÈë¿ò£»ÕæÕı¼ÓÈëºòÑ¡ĞèÔÙµã Apply¡£
     function onFrfAxisClicked(~, ~)
         stopPreviewAnimation(true, true);
         freqVal = getClickedFrequency();
@@ -858,6 +879,7 @@
         updateStatus(sprintf('Extracted mode near %.8g Hz (actual %.8g Hz).', mode.requestedFreq, mode.actualFreq));
     end
 
+    % Ô¤ÀÀ¶¯»­³ÖĞøÑ­»·²¥·Å£¬Ö±µ½ÆµÂÊÇĞ»»»ò´°¿Ú¹Ø±Õ¡£
     function onPreviewMode(~, ~)
         mode = ensureModeExtracted();
         if isempty(mode)
@@ -905,6 +927,7 @@
         end
     end
 
+    % ÒÔµ±Ç°Ä¿±êÆµÂÊÎªÖĞĞÄ£¬´ÓËùÓĞÓĞĞ§²âµãÖĞÌáÈ¡¸´ÊıÕñĞÍ²¢×ö¹éÒ»»¯¡£
     function mode = extractCurrentMode(targetFreq)
         app.points = parsePointTableData(get(tblPoints, 'Data'));
         app.lines = parseLineTableData(get(tblLines, 'Data'));
@@ -959,6 +982,7 @@
         mode.lines = activeLineRows(app.lines);
     end
 
+    % Í¬Ò» PointID ¿ÉÓÉ¶àĞĞ/¶àÎÄ¼ş¹²Í¬×é³É£¬°´·½ÏòÖÊÁ¿ºÏ²¢ÎªÒ»¸öÈıÏò²âµã¡£
     function [vec, cohVec, actualFreq, fileNameLabel] = extractGroupedPointModeVector(rows, targetFreq)
         vec = nan(1, 3);
         cohVec = nan(1, 3);
@@ -1037,7 +1061,7 @@
 
     function refreshFileList()
         if isempty(app.files)
-            set(lstFiles, 'String', {'No file loaded'}, 'Value', 1);
+            set(lstFiles, 'String', {'Î´¼ÓÔØÎÄ¼ş'}, 'Value', 1);
             return;
         end
         names = cell(numel(app.files), 1);
@@ -1059,6 +1083,7 @@
         set(tblLines, 'Data', buildLineTableData(app.lines));
     end
 
+    % Í³Ò»Ë¢ĞÂºòÑ¡ÁĞ±í£¬±£Áô×Ô¶¯·åÖµÓëÊÖ¹¤¼ÓÈëµÄÆµÂÊ£¬²¢¾¡Á¿±£³Öµ±Ç°Ñ¡ÖĞÏî¡£
     function refreshCandidateList(peakFreqs)
         if nargin < 1
             peakFreqs = app.currentFrf.peaks;
@@ -1092,7 +1117,7 @@
         end
         app.currentFrf.displayFreqs = displayFreqs;
         if isempty(displayFreqs)
-            set(lstCandidates, 'String', {'(none)'}, 'Value', 1);
+            set(lstCandidates, 'String', {'(¿Õ)'}, 'Value', 1);
             return;
         end
         selIdx = 1;
@@ -1105,6 +1130,7 @@
         set(lstCandidates, 'String', items, 'Value', selIdx);
     end
 
+    % FRF ÊÓÍ¼¼ÈÕ¹Ê¾×ÛºÏÇúÏß£¬Ò²µş¼Ó×Ô¶¯·å¡¢ÊÖ¶¯ºòÑ¡ºÍµ±Ç°Ñ¡ÖĞÆµÂÊ¡£
     function refreshFrfAxis()
         cla(axFrf);
         if isempty(app.currentFrf.freq) || isempty(app.currentFrf.db)
@@ -1118,9 +1144,9 @@
         freq = app.currentFrf.freq;
         dbCurve = app.currentFrf.db;
         if isempty(freq) || isempty(dbCurve)
-            title(axFrf, 'Modal FRF Candidate View');
-            xlabel(axFrf, 'Frequency (Hz)');
-            ylabel(axFrf, 'Magnitude (dB)');
+            title(axFrf, 'Ä£Ì¬ FRF ºòÑ¡Í¼');
+            xlabel(axFrf, 'ÆµÂÊ (Hz)');
+            ylabel(axFrf, '·ùÖµ (dB)');
             set(axFrf, 'XScale', 'log', 'YGrid', 'on', 'XGrid', 'on');
             return;
         end
@@ -1225,18 +1251,19 @@
         xlabel(axFrf, 'Frequency (Hz)');
         ylabel(axFrf, 'Magnitude (dB)');
         if isfinite(app.activeModeFreq) && app.activeModeFreq > 0
-            title(axFrf, sprintf('Modal FRF Candidate View - Selected %.8g Hz', app.activeModeFreq));
+            title(axFrf, sprintf('Ä£Ì¬ FRF ºòÑ¡Í¼ - µ±Ç° %.8g Hz', app.activeModeFreq));
         else
-            title(axFrf, 'Modal FRF Candidate View');
+            title(axFrf, 'Ä£Ì¬ FRF ºòÑ¡Í¼');
         end
     end
 
+    % ²âµã¹Ç¼ÜÍ¼Ö»»­¾ÛºÏºóµÄÎ¨Ò»²âµã£¬±ÜÃâÍ¬Ò» PointID ÖØ¸´ÏÔÊ¾¡£
     function refreshPointAxis()
         cla(axLayout);
         rows = getUsablePointRows(app.points, app.files, false);
         pointGroups = aggregatePointRowsById(rows);
         if isempty(pointGroups)
-            title(axLayout, 'Point Layout');
+            title(axLayout, '²âµã¹Ç¼ÜÍ¼');
             view(axLayout, 3);
             axis(axLayout, 'equal');
             return;
@@ -1260,7 +1287,7 @@
         end
         hold(axLayout, 'off');
         styleStructureAxis(axLayout, coords);
-        title(axLayout, sprintf('Point Layout (%d lines)', size(lineInfo.validEdges, 1)));
+        title(axLayout, sprintf('²âµã¹Ç¼ÜÍ¼£¨%d ÌõÁ¬Ïß£©', size(lineInfo.validEdges, 1)));
         if lineInfo.invalidCount > 0
             updateStatus(sprintf('Ignored %d invalid line(s) during layout preview.', lineInfo.invalidCount));
         end
@@ -1269,7 +1296,7 @@
     function refreshModeAxis()
         cla(axMode);
         if isempty(app.lastMode)
-            title(axMode, 'Mode Shape Preview');
+            title(axMode, 'ÕñĞÍÔ¤ÀÀ');
             axis(axMode, 'equal');
             view(axMode, 3);
             hidePreviewAxis(axMode);
@@ -1278,6 +1305,7 @@
         renderModeSkeleton(axMode, app.lastMode, 1, true, false);
     end
 
+    % ÕñĞÍ»æÖÆºËĞÄ£º¸ù¾İÏàÎ»Éú³ÉË²Ê±±äĞÎ£¬²¢¿ÉÑ¡ÔñÊÇ·ñ±£Áôµ±Ç°ÊÓ½Ç¡£
     function renderModeSkeleton(ax, mode, phaseValue, showLabels, preserveView)
         if nargin < 4
             showLabels = false;
@@ -1311,7 +1339,7 @@
         hold(ax, 'off');
         styleStructureAxis(ax, [coords; coordsDef], viewState);
         hidePreviewAxis(ax);
-        title(ax, sprintf('Mode Shape Preview - Request %.4g Hz / Actual %.4g Hz', mode.requestedFreq, mode.actualFreq));
+        title(ax, sprintf('ÕñĞÍÔ¤ÀÀ - ÇëÇó %.4g Hz / Êµ¼Ê %.4g Hz', mode.requestedFreq, mode.actualFreq));
     end
 
     function animateMode(ax, mode, exportOnly, gifPath)
@@ -1348,6 +1376,7 @@
         end
     end
 
+    % Á¬Ğø¶¯»­Í¨¹ı timer Çı¶¯£»¾²Ì¬Í¼Óë¶¯»­Í¼¹²ÓÃÍ¬Ò»Ì×»æÖÆÂß¼­¡£
     function startPreviewAnimation(mode)
         stopPreviewAnimation(false, false);
         app.previewPhaseIndex = 0;
@@ -1376,6 +1405,7 @@
         stopPreviewAnimation(false, false);
     end
 
+    % Í£Ö¹¶¯»­Ê±¿ÉÑ¡ÊÇ·ñ»Ö¸´¾²Ì¬Í¼£¬ÒÔ¼°ÊÇ·ñ°ÑÊÓ½ÇÖØÖÃ»ØÄ¬ÈÏ 3D ÊÓÍ¼¡£
     function stopPreviewAnimation(resetToStatic, resetView)
         if nargin < 1
             resetToStatic = true;
@@ -1412,6 +1442,7 @@
         animateMode([], mode, true, gifPath);
     end
 
+    % ÓÃËùÓĞÓĞĞ§²âµã/·½ÏòµÄ´«º¯¹¹ÔìÒ»Ìõ×ÛºÏ FRF£¬×÷Îª×Ô¶¯ÕÒ·åµÄÖ÷²Î¿¼¡£
     function [freq, dbCurve] = buildAggregateFrfCurve()
         freq = [];
         dbCurve = [];
@@ -1469,6 +1500,7 @@
         dbCurve = 20 * log10(magMean(valid));
     end
 
+    % ÔÚ¶ÔÊıÆµÂÊÖáÉÏÆ½»¬ÕÒ·å£¬ÔÙ»ØÎü¸½µ½Ô­Ê¼ÇúÏß¾Ö²¿×î´óÖµ£¬¼õÉÙÆ«·åÏÖÏó¡£
     function [peakFreqs, smoothDb] = findProminentPeaks(freq, dbCurve, maxCount)
         peakFreqs = [];
         smoothDb = [];
@@ -1548,6 +1580,7 @@
         peakFreqs = refinePeakFreqsToRawMax(freq, dbCurve, peakFreqs);
     end
 
+    % ²¹³ä¸÷µ¥¶À FRF µÄ¾Ö²¿·å£¬±ÜÃâÖ»ÔÚÄ³¸ö²âµãÃ÷ÏÔµÄÄ£Ì¬±»Æ½¾ùÄ¨µô¡£
     function peakFreqs = collectIndividualFrfPeakFreqs(maxPerCurve)
         peakFreqs = [];
         rows = getUsablePointRows(app.points, app.files);
@@ -1583,7 +1616,7 @@
                 dbLocal = 20 * log10(abs(xferAligned(valid)));
                 localPeaks = findProminentPeaks(f, dbLocal, maxPerCurve);
                 if ~isempty(localPeaks)
-                    peakFreqs = [peakFreqs(:); localPeaks(:)]; %#ok<AGROW>
+                    peakFreqs = [peakFreqs(:); localPeaks(:)];
                 end
             end
         end
@@ -1619,7 +1652,7 @@
         end
         tolLog = 0.015;
         if all(abs(log10(freqList(:)) - log10(freqVal)) > tolLog)
-            freqList(end + 1, 1) = freqVal; %#ok<AGROW>
+            freqList(end + 1, 1) = freqVal;
         end
     end
 
@@ -1733,6 +1766,7 @@
         peakFreqs = refined(keep).';
     end
 
+    % µ±Ç°»î¶¯ÆµÂÊÇĞ»»ºó£¬Á¢¼´Çå¿Õ¾ÉÕñĞÍ²¢Ë¢ĞÂ FRF ±ê¼ÇÓëºòÑ¡Ñ¡ÖĞÌ¬¡£
     function applyActiveModeFreq(freqVal, ~)
         if ~isfinite(freqVal) || freqVal <= 0
             return;
@@ -1822,7 +1856,7 @@
     end
 
     function updateStatus(msg)
-        set(txtStatus, 'String', ['Status: ' msg]);
+        set(txtStatus, 'String', ['×´Ì¬: ' msg]);
         drawnow;
     end
 
@@ -1841,6 +1875,7 @@
         end
     end
 
+    % Í³Ò»¿ØÖÆ½á¹¹Í¼µÄÏÔÊ¾·¶Î§¡¢µÈ±ÈÀıËõ·ÅºÍÊÓ½Ç»Ö¸´¡£
     function styleStructureAxis(ax, coords, viewState)
         if nargin < 3
             viewState = [];
@@ -1892,6 +1927,7 @@
         zlabel(ax, '');
     end
 
+    % ½ö±£ÁôÆôÓÃ×´Ì¬ÇÒ×Ö¶ÎÍêÕûµÄ²âµãĞĞ£»¿É°´ĞèÒªÒªÇó±ØĞë°ó¶¨µ½ÒÑ¼ÓÔØÎÄ¼ş¡£
     function rows = getUsablePointRows(points, files, requireBound)
         if nargin < 3
             requireBound = true;
@@ -1934,6 +1970,7 @@
         end
     end
 
+    % ×Ô¶¯Á¬ÏßÖ»¸ºÔğ²¹²İ¸å£¬²»¸²¸ÇÊÖ¹¤Ïß£»×îÖÕ½á¹û°´È¥ÖØºóµÄÏß¼¯Êä³ö¡£
     function linesOut = mergeAutoLines(existingLines, autoLines)
         existingLines = sanitizeLineRows(existingLines);
         autoLines = sanitizeLineRows(autoLines);
@@ -1972,6 +2009,7 @@
         end
     end
 
+    % ×Ô¶¯ÍØÆËÍÆ¶Ï²ÉÓÃ×îĞ¡Éú³ÉÊ÷ + ¾Ö²¿½üÁÚ²¹Ïß£¬ÓÅÏÈ±£Ö¤½á¹¹Á¬Í¨¡£
     function linesOut = inferAutoLines(points)
         rows = getUsablePointRows(points, app.files, false);
         rows = aggregatePointRowsById(rows);
@@ -2195,6 +2233,7 @@
         end
     end
 
+    % ¶ÁÈ¡ FRF ºó°´¼¤Àø/ÏìÓ¦Í¨µÀ¹¤³Ìµ¥Î»×öĞŞÕı£¬±£³Ö²»Í¬ÎÄ¼ş¼äÁ¿¸ÙÒ»ÖÂ¡£
     function [xfer, coh] = getCorrectedXfer(F, exciteCh, respCh)
         xfer = [];
         coh = [];
@@ -2214,6 +2253,7 @@
         end
     end
 
+    % Í¬Ò» PointID µÄ¶àĞĞÊı¾İ»áÔÚÕâÀï¾ÛºÏ£¬Ö§³Ö¡°Í¬²âµã¶àÎÄ¼ş¶à·½Ïò¡±³¡¾°¡£
     function groups = aggregatePointRowsById(rows)
         groups = struct('pointId', {}, 'coords', {}, 'rows', {}, 'boundMask', {});
         if isempty(rows)
@@ -2230,18 +2270,19 @@
             isBound = findFileIndexByName(app.files, row.fileName) > 0;
             if isempty(idx)
                 idx = numel(keys) + 1;
-                keys{idx} = key; %#ok<AGROW>
-                groups(idx).pointId = row.pointId; %#ok<AGROW>
+                keys{idx} = key;
+                groups(idx).pointId = row.pointId;
                 groups(idx).coords = [row.x, row.y, row.z];
                 groups(idx).rows = row;
                 groups(idx).boundMask = isBound;
             else
-                groups(idx).rows(end + 1) = row; %#ok<AGROW>
-                groups(idx).boundMask(end + 1) = isBound; %#ok<AGROW>
+                groups(idx).rows(end + 1) = row;
+                groups(idx).boundMask(end + 1) = isBound;
             end
         end
     end
 
+    % Ä³Ğ© .vna µÄÆµÂÊÖá³¤¶ÈÓë xfer/coh ³¤¶È²»ÍêÈ«Ò»ÖÂ£¬ÕâÀïÍ³Ò»¶ÔÆë¡£
     function [freqAligned, seriesAligned, auxAligned] = alignFreqAndSeries(freqRaw, seriesRaw, auxRaw)
         freqAligned = [];
         seriesAligned = [];
@@ -2318,6 +2359,7 @@
         end
     end
 
+    % ½âÎöµ¥¸ö .vna ÎÄ¼ş£¬Ö»ÌáÈ¡µ±Ç°½Å±¾ÕæÕıÊ¹ÓÃµ½µÄÄ£Ì¬Ïà¹Ø×Ö¶Î¡£
     function F = parseModalVnaFile(filePath)
         S = load(filePath, '-mat');
         if isfield(S, 'SLm')
@@ -2364,6 +2406,7 @@
         val = raw(1);
     end
 
+    % Ä¬ÈÏ±í¸ñ½á¹¹£º±£Ö¤ GUI ³õ´Î´ò¿ªÊ±¾ÍÓĞ¿É±à¼­µÄ¿ÕĞĞ¡£
     function pointRows = defaultPointRows()
         pointRows = struct('use', {}, 'pointId', {}, 'fileName', {}, 'xCh', {}, 'yCh', {}, 'zCh', {}, 'x', {}, 'y', {}, 'z', {});
         pointRows(1) = defaultPointRow();
@@ -2381,6 +2424,7 @@
         row = struct('use', true, 'startPointId', '', 'endPointId', '', 'source', 'manual');
     end
 
+    % ½á¹¹ÌåÊı×éÓë uitable µ¥Ôª¸ñÊı¾İÖ®¼ä×öË«Ïò×ª»»£¬±ãÓÚ±à¼­Óë³Ö¾Ã»¯¡£
     function data = buildPointTableData(points)
         data = cell(numel(points), 9);
         for i = 1:numel(points)
@@ -2396,6 +2440,7 @@
         end
     end
 
+    % ´Ó±í¸ñ¶Á»Ø²âµã½á¹¹ÌåÊ±£¬Ë³ÊÖ×öÎÄ±¾/ÊıÖµ/Âß¼­µÄ¹æ·¶»¯ÇåÏ´¡£
     function rows = parsePointTableData(data)
         rows = struct('use', {}, 'pointId', {}, 'fileName', {}, 'xCh', {}, 'yCh', {}, 'zCh', {}, 'x', {}, 'y', {}, 'z', {});
         if isempty(data)
@@ -2449,6 +2494,7 @@
         rows = sanitizeLineRows(rows);
     end
 
+    % Á¬ÏßĞĞÔÚ±£´æÇ°×ö»ù´¡ÇåÏ´£¬±ÜÃâ¿Õ×Ö¶ÎºÍÔàÊı¾İ¼ÌĞøÏòºó´«²¥¡£
     function rows = sanitizeLineRows(rows)
         cleaned = struct('use', {}, 'startPointId', {}, 'endPointId', {}, 'source', {});
         for i = 1:numel(rows)
@@ -2611,6 +2657,32 @@
         for i = 1:numel(points)
             if ~isempty(strtrim(points(i).fileName))
                 bindings{end + 1} = points(i).fileName; %#ok<AGROW>
+            end
+        end
+    end
+
+    % 2016b µÈ¾É°æ±¾Í¼ĞÎ½Ó¿Ú¸üÃô¸Ğ£¬ÕâÀïµ¥¶À×ö°æ±¾ÅĞ¶Ï¡£
+    function tf = isLegacyMatlabRelease()
+        try
+            tf = verLessThan('matlab', '9.2');
+        catch
+            tf = false;
+        end
+    end
+
+    % rotate3d ÔÚĞÂÀÏ°æ±¾µ÷ÓÃĞÎÊ½²»Í¬£¬ÕâÀïÍ³Ò»·â×°¼æÈİÈë¿Ú¡£
+    function enableFigureRotate3d(figHandle)
+        try
+            if app.isLegacyMatlab
+                hRotate = rotate3d(figHandle);
+                set(hRotate, 'Enable', 'on');
+            else
+                rotate3d(figHandle, 'on');
+            end
+        catch
+            try
+                rotate3d on;
+            catch
             end
         end
     end

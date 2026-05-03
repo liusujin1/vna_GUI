@@ -19,6 +19,8 @@ function view_modal_shape()
     app.lastMode = [];
     app.selectedPointRows = [];
     app.selectedLineRows = [];
+    app.currentPointRow = NaN;
+    app.currentLineRow = NaN;
     app.selectedFiles = [];
     app.previewTimer = [];
     app.previewPhaseIndex = 0;
@@ -110,15 +112,30 @@ function view_modal_shape()
         'Style', 'pushbutton', ...
         'String', '新增测点', ...
         'Units', 'normalized', ...
-        'Position', [0.62 0.784 0.15 0.028], ...
+        'Position', [0.50 0.784 0.15 0.028], ...
         'Callback', @onAddPointRow); %#ok<NASGU>
+
+    txtPointRow = uicontrol( ... %#ok<NASGU>
+        'Parent', pnlLeft, ...
+        'Style', 'text', ...
+        'String', '行号', ...
+        'HorizontalAlignment', 'left', ...
+        'Units', 'normalized', ...
+        'Position', [0.66 0.786 0.05 0.022]); %#ok<NASGU>
+
+    edtPointRow = uicontrol( ... %#ok<NASGU>
+        'Parent', pnlLeft, ...
+        'Style', 'edit', ...
+        'String', '', ...
+        'Units', 'normalized', ...
+        'Position', [0.71 0.784 0.07 0.028]); %#ok<NASGU>
 
     btnDeletePoint = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', '删除测点', ...
         'Units', 'normalized', ...
-        'Position', [0.79 0.784 0.16 0.028], ...
+        'Position', [0.80 0.784 0.15 0.028], ...
         'Callback', @onDeletePointRows); %#ok<NASGU>
 
     % 测点表：每行描述一个“测点-文件-三方向通道-空间坐标”的绑定关系。
@@ -126,7 +143,7 @@ function view_modal_shape()
         'Parent', pnlLeft, ...
         'Units', 'normalized', ...
         'Position', [0.03 0.44 0.92 0.34], ...
-        'ColumnName', {'Use', 'PointID', 'FileName', 'XCh', 'YCh', 'ZCh', 'X', 'Y', 'Z'}, ...
+        'ColumnName', {'启用', '测点编号', '文件名', 'X通道', 'Y通道', 'Z通道', 'X', 'Y', 'Z'}, ...
         'ColumnWidth', {42, 64, 96, 46, 46, 46, 54, 54, 54}, ...
         'ColumnEditable', true(1, 9), ...
         'ColumnFormat', {'logical', 'char', 'char', 'numeric', 'numeric', 'numeric', 'numeric', 'numeric', 'numeric'}, ...
@@ -146,15 +163,30 @@ function view_modal_shape()
         'Style', 'pushbutton', ...
         'String', '自动连线', ...
         'Units', 'normalized', ...
-        'Position', [0.42 0.40 0.22 0.026], ...
+        'Position', [0.35 0.40 0.19 0.026], ...
         'Callback', @onAutoBuildLines); %#ok<NASGU>
+
+    txtLineRow = uicontrol( ... %#ok<NASGU>
+        'Parent', pnlLeft, ...
+        'Style', 'text', ...
+        'String', '行号', ...
+        'HorizontalAlignment', 'left', ...
+        'Units', 'normalized', ...
+        'Position', [0.70 0.402 0.06 0.020]); %#ok<NASGU>
+
+    edtLineRow = uicontrol( ... %#ok<NASGU>
+        'Parent', pnlLeft, ...
+        'Style', 'edit', ...
+        'String', '', ...
+        'Units', 'normalized', ...
+        'Position', [0.74 0.400 0.06 0.026]); %#ok<NASGU>
 
     btnAddLine = uicontrol( ... %#ok<NASGU>
         'Parent', pnlLeft, ...
         'Style', 'pushbutton', ...
         'String', '新增连线', ...
         'Units', 'normalized', ...
-        'Position', [0.66 0.40 0.13 0.026], ...
+        'Position', [0.56 0.40 0.13 0.026], ...
         'Callback', @onAddLineRow); %#ok<NASGU>
 
     btnDeleteLine = uicontrol( ... %#ok<NASGU>
@@ -162,7 +194,7 @@ function view_modal_shape()
         'Style', 'pushbutton', ...
         'String', '删除连线', ...
         'Units', 'normalized', ...
-        'Position', [0.81 0.40 0.14 0.026], ...
+        'Position', [0.82 0.40 0.13 0.026], ...
         'Callback', @onDeleteLineRows); %#ok<NASGU>
 
     % 连线表：定义骨架拓扑，供静态图、动画图和 GIF 共用。
@@ -170,7 +202,8 @@ function view_modal_shape()
         'Parent', pnlLeft, ...
         'Units', 'normalized', ...
         'Position', [0.03 0.04 0.92 0.35], ...
-        'ColumnName', {'Use', 'StartPointID', 'EndPointID', 'Source'}, ...
+        'ColumnName', {'启用', '起点测点', '终点测点', '来源'}, ...
+        'ColumnWidth', {48, 110, 110, 72}, ...
         'ColumnEditable', true(1, 4), ...
         'ColumnFormat', {'logical', 'char', 'char', 'char'}, ...
         'CellEditCallback', @onLineTableEdited, ...
@@ -530,21 +563,44 @@ function view_modal_shape()
 
     function onFileSelectionChanged(~, ~)
         app.selectedFiles = get(lstFiles, 'Value');
+        try
+            clickType = get(fig, 'SelectionType');
+        catch
+            clickType = '';
+        end
+        if ischar(clickType) && strcmpi(clickType, 'open') && isscalar(app.selectedFiles) ...
+                && ~isempty(app.files) && app.selectedFiles >= 1 && app.selectedFiles <= numel(app.files)
+            addPointBoundToFile(app.selectedFiles);
+        end
+    end
+
+    function addPointBoundToFile(fileIdx)
+        app.points = parsePointTableData(get(tblPoints, 'Data'));
+        newRow = defaultPointRow();
+        newRow.pointId = nextPointId(app.points);
+        newRow.fileName = app.files(fileIdx).name;
+        app.points(end + 1) = newRow;
+        invalidateFrfState();
+        invalidateModeState();
+        refreshPointTable();
+        refreshPointAxis();
+        refreshModeAxis();
+        updateStatus(sprintf('Added point row bound to file: %s', app.files(fileIdx).name));
     end
 
     % 追加一个新的测点行，默认继承当前选中文件名，便于快速录入。
     function onAddPointRow(~, ~)
+        if ~isempty(app.files)
+            fileIdx = getPreferredFileIndex();
+            if ~(fileIdx >= 1 && fileIdx <= numel(app.files))
+                fileIdx = 1;
+            end
+            addPointBoundToFile(fileIdx);
+            return;
+        end
         app.points = parsePointTableData(get(tblPoints, 'Data'));
         newRow = defaultPointRow();
         newRow.pointId = nextPointId(app.points);
-        if ~isempty(app.files)
-            fileIdx = getPreferredFileIndex();
-            if fileIdx >= 1 && fileIdx <= numel(app.files)
-                newRow.fileName = app.files(fileIdx).name;
-            else
-                newRow.fileName = app.files(1).name;
-            end
-        end
         app.points(end+1) = newRow;
         invalidateFrfState();
         refreshPointTable();
@@ -563,6 +619,12 @@ function view_modal_shape()
                 rows = unique(ud(:).');
             end
         end
+        if isempty(rows)
+            rows = parseRowIndexField(edtPointRow);
+        end
+        if isempty(rows) && isfinite(app.currentPointRow)
+            rows = app.currentPointRow;
+        end
         if isempty(rows) && ~isempty(app.points)
             rows = 1;
         end
@@ -580,7 +642,9 @@ function view_modal_shape()
         app.points = app.points(keep);
         app.lines = removeInvalidLines(app.lines, app.points);
         app.selectedPointRows = [];
+        app.currentPointRow = NaN;
         set(tblPoints, 'UserData', []);
+        set(edtPointRow, 'String', '');
         invalidateFrfState();
         invalidateModeState();
         refreshPointTable();
@@ -591,7 +655,13 @@ function view_modal_shape()
     end
 
     % 测点表一旦修改，需要同步重建自动连线、FRF 缓存和预览结果。
-    function onPointTableEdited(~, ~)
+    function onPointTableEdited(~, event)
+        app.selectedPointRows = selectionRows(event);
+        if ~isempty(app.selectedPointRows)
+            app.currentPointRow = app.selectedPointRows(1);
+            set(tblPoints, 'UserData', app.selectedPointRows);
+            set(edtPointRow, 'String', num2str(app.currentPointRow));
+        end
         app.points = parsePointTableData(get(tblPoints, 'Data'));
         app.lines = removeInvalidLines(app.lines, app.points);
         if isempty(app.lines) || ~hasManualLine(app.lines)
@@ -609,6 +679,10 @@ function view_modal_shape()
     function onPointTableSelected(~, event)
         app.selectedPointRows = selectionRows(event);
         set(tblPoints, 'UserData', app.selectedPointRows);
+        if ~isempty(app.selectedPointRows)
+            app.currentPointRow = app.selectedPointRows(1);
+            set(edtPointRow, 'String', num2str(app.currentPointRow));
+        end
     end
 
     function onAddLineRow(~, ~)
@@ -630,21 +704,49 @@ function view_modal_shape()
         app.lines = parseLineTableData(get(tblLines, 'Data'));
         rows = unique(app.selectedLineRows);
         if isempty(rows)
+            ud = get(tblLines, 'UserData');
+            if isnumeric(ud) && ~isempty(ud)
+                rows = unique(ud(:).');
+            end
+        end
+        if isempty(rows)
+            rows = parseRowIndexField(edtLineRow);
+        end
+        if isempty(rows) && isfinite(app.currentLineRow)
+            rows = app.currentLineRow;
+        end
+        if isempty(rows) && ~isempty(app.lines)
+            rows = 1;
+        end
+        if isempty(rows)
+            updateStatus('Select one or more line rows to delete.');
+            return;
+        end
+        rows = rows(rows >= 1 & rows <= numel(app.lines));
+        if isempty(rows)
+            updateStatus('Selected line rows are invalid.');
             return;
         end
         keep = true(1, numel(app.lines));
         keep(rows) = false;
         app.lines = app.lines(keep);
-        if isempty(app.lines)
-            app.lines = defaultLineRows();
-        end
+        app.selectedLineRows = [];
+        app.currentLineRow = NaN;
+        set(tblLines, 'UserData', []);
+        set(edtLineRow, 'String', '');
         refreshLineTable();
         refreshPointAxis();
         refreshModeAxis();
         updateStatus(sprintf('Deleted %d line row(s).', numel(rows)));
     end
 
-    function onLineTableEdited(~, ~)
+    function onLineTableEdited(~, event)
+        app.selectedLineRows = selectionRows(event);
+        if ~isempty(app.selectedLineRows)
+            app.currentLineRow = app.selectedLineRows(1);
+            set(tblLines, 'UserData', app.selectedLineRows);
+            set(edtLineRow, 'String', num2str(app.currentLineRow));
+        end
         app.lines = parseLineTableData(get(tblLines, 'Data'));
         refreshPointAxis();
         refreshModeAxis();
@@ -653,6 +755,11 @@ function view_modal_shape()
 
     function onLineTableSelected(~, event)
         app.selectedLineRows = selectionRows(event);
+        set(tblLines, 'UserData', app.selectedLineRows);
+        if ~isempty(app.selectedLineRows)
+            app.currentLineRow = app.selectedLineRows(1);
+            set(edtLineRow, 'String', num2str(app.currentLineRow));
+        end
     end
 
     % 根据测点空间位置自动推断一版骨架连线，供后续人工修正。
@@ -1081,6 +1188,9 @@ function view_modal_shape()
 
     function refreshLineTable()
         set(tblLines, 'Data', buildLineTableData(app.lines));
+        if isempty(app.lines)
+            set(tblLines, 'UserData', []);
+        end
     end
 
     % 统一刷新候选列表，保留自动峰值与手工加入的频率，并尽量保持当前选中项。
@@ -2579,6 +2689,33 @@ function view_modal_shape()
             return;
         end
         rows = unique(event.Indices(:, 1));
+    end
+
+    function rows = parseRowIndexField(hEdit)
+        rows = [];
+        try
+            txt = strtrim(get(hEdit, 'String'));
+        catch
+            txt = '';
+        end
+        if isempty(txt)
+            return;
+        end
+        txt = strrep(txt, '，', ',');
+        parts = regexp(txt, '[,\s;]+', 'split');
+        tmp = [];
+        for iPart = 1:numel(parts)
+            if isempty(parts{iPart})
+                continue;
+            end
+            v = str2double(parts{iPart});
+            if isfinite(v) && v >= 1
+                tmp(end + 1) = round(v); %#ok<AGROW>
+            end
+        end
+        if ~isempty(tmp)
+            rows = unique(tmp);
+        end
     end
 
     function nextId = nextPointId(points)

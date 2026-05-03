@@ -4,14 +4,14 @@ function view_dyna_gui()
 % - plot button drives time/PSD/transmissibility
 % - optional low-pass/high-pass filtering in time domain
 
-% æ ¹æ®å±å¹•åˆ†è¾¨ç‡è®¡ç®—åˆå§‹çª—å£å°ºå¯¸ï¼ˆä¿ç•™æœ€å°æ˜¾ç¤ºç©ºé—´ï¼‰
+% ¸ù¾İÆÁÄ»·Ö±æÂÊ¼ÆËã³õÊ¼´°¿Ú³ß´ç£¨±£Áô×îĞ¡ÏÔÊ¾¿Õ¼ä£©
 screenSz = get(0, 'ScreenSize');
 figW = max(1220, min(round(screenSz(3) * 0.80), 1420));
 figH = max(760, min(round(screenSz(4) * 0.76), 820));
 figX = max(20, round((screenSz(3) - figW) / 2));
 figY = max(20, round((screenSz(4) - figH) / 2));
 
-% åˆ›å»ºä¸»çª—å£ï¼Œå¹¶å…³é—­çª—å£ç¼–å·æ˜¾ç¤º
+% ´´½¨Ö÷´°¿Ú£¬²¢¹Ø±Õ´°¿Ú±àºÅÏÔÊ¾
 fig = figure( ...
     'Name', 'Vibration Viewer', ...
     'NumberTitle', 'off', ...
@@ -20,12 +20,12 @@ fig = figure( ...
     'MenuBar', 'figure', ...
     'ToolBar', 'figure', ...
     'Resize', 'on');
-% åˆå§‹åŒ–åº”ç”¨çŠ¶æ€ï¼ˆæ–‡ä»¶åˆ—è¡¨ã€æ•°æ®é¡¹ã€æ»¤æ³¢ä¸è‡ªå®šä¹‰ä¿¡æ¯ï¼‰
+% ³õÊ¼»¯Ó¦ÓÃ×´Ì¬£¨ÎÄ¼şÁĞ±í¡¢Êı¾İÏî¡¢ÂË²¨Óë×Ô¶¨ÒåĞÅÏ¢£©
 app = initAppState();
 app.lastOpenDir = pwd;
 setappdata(fig, 'app', app);
 
-% å·¦ä¾§æ§åˆ¶é¢æ¿ï¼šæ–‡ä»¶åŠ è½½ã€æ•°æ®åˆ—è¡¨ã€é‡å‘½åä¸æ»¤æ³¢å‚æ•°
+% ×ó²à¿ØÖÆÃæ°å£ºÎÄ¼ş¼ÓÔØ¡¢Êı¾İÁĞ±í¡¢ÖØÃüÃûÓëÂË²¨²ÎÊı
 panel = uipanel('Parent', fig, 'Title', 'Controls', 'Units', 'pixels', 'Position', [15 15 360 890]);
 
 btnLoad = uicontrol('Parent', panel, 'Style', 'pushbutton', ...
@@ -200,13 +200,13 @@ lblStatus = uicontrol('Parent', panel, 'Style', 'text', ...
     'HorizontalAlignment', 'left', ...
     'Position', [15 340 330 40]);
 
-% å³ä¾§ä¸‰å¹…å›¾çš„ç±»å‹é€‰æ‹©ä¸å¯¼å‡ºæŒ‰é’®
-% å·¦ä¾§æŠ˜å åˆ†ç»„çŠ¶æ€ï¼ˆä¼šè¯å†…ä¿æŒï¼‰
+% ÓÒ²àÈı·ùÍ¼µÄÀàĞÍÑ¡ÔñÓëµ¼³ö°´Å¥
+% ×ó²àÕÛµş·Ö×é×´Ì¬£¨»á»°ÄÚ±£³Ö£©
 isDataGroupExpanded = true;
 isMainGroupExpanded = false;
 isPlotGroupExpanded = true;
 
-% å·¦ä¾§æŠ˜å åˆ†ç»„ï¼šæ ‡é¢˜æŒ‰é’® + å†…å®¹é¢æ¿ï¼ˆMATLAB 2016 compatibleï¼‰
+% ×ó²àÕÛµş·Ö×é£º±êÌâ°´Å¥ + ÄÚÈİÃæ°å£¨MATLAB 2016 compatible£©
 btnDataGroup = uicontrol('Parent', panel, 'Style', 'togglebutton', ...
     'String', '[-] Data', ...
     'Value', 1, ...
@@ -289,7 +289,7 @@ btnFig3 = uicontrol('Parent', tabMain, 'Style', 'pushbutton', ...
     'String', 'Figure', ...
     'Position', [556 366 62 26]);
 
-% ä¸‰ä¸ªä¸»ç»˜å›¾åŒºï¼šæ—¶åŸŸã€PSDã€ä¼ é€’ç‡
+% Èı¸öÖ÷»æÍ¼Çø£ºÊ±Óò¡¢PSD¡¢´«µİÂÊ
 axMain1 = axes('Parent', tabMain, 'Units', 'pixels', 'Position', [20 585 1030 235], 'Box', 'on');
 title(axMain1, 'Time Domain');
 xlabel(axMain1, 'Time (s)');
@@ -310,7 +310,7 @@ ylabel(axMain3, 'dB');
 set(axMain3, 'XScale', 'log', 'YScale', 'linear');
 grid(axMain3, 'on');
 
-% æ¯å¹…å›¾æ—è¾¹çš„ Figure æŒ‰é’®ï¼šå¯¼å‡ºå½“å‰å›¾åˆ°å•ç‹¬çª—å£
+% Ã¿·ùÍ¼ÅÔ±ßµÄ Figure °´Å¥£ºµ¼³öµ±Ç°Í¼µ½µ¥¶À´°¿Ú
 lblVibFile = uicontrol('Parent', tabFoundation, 'Style', 'text', ...
     'String', 'Vib File:', ...
     'HorizontalAlignment', 'left', ...
@@ -423,11 +423,11 @@ set(btnFoundVibFig, 'Callback', @onOpenFoundationVibFigure);
 set(btnFoundStiffCohFig, 'Callback', @onOpenFoundationStiffCohFigure);
 refreshFoundationFileSelectors();
 
-% ç»‘å®šçª—å£å°ºå¯¸å˜åŒ–å›è°ƒå¹¶æ‰§è¡Œä¸€æ¬¡åˆå§‹å¸ƒå±€
+% °ó¶¨´°¿Ú³ß´ç±ä»¯»Øµ÷²¢Ö´ĞĞÒ»´Î³õÊ¼²¼¾Ö
 set(fig, 'ResizeFcn', @onResize);
 onResize();
 
-    % è‡ªé€‚åº”å¸ƒå±€ï¼šæ ¹æ®çª—å£å°ºå¯¸é‡æ’å·¦ä¾§æ§ä»¶å’Œå³ä¾§ä¸‰å¹…å›¾
+    % ×ÔÊÊÓ¦²¼¾Ö£º¸ù¾İ´°¿Ú³ß´çÖØÅÅ×ó²à¿Ø¼şºÍÓÒ²àÈı·ùÍ¼
     function onResize(~, ~)
         figPos = get(fig, 'Position');
         fw = figPos(3);
@@ -787,7 +787,7 @@ onResize();
         set(btnFoundStiffCohFig, 'Position', [fBtnX, stiffBtnY, fBtnW, fBtnH]);
     end
 
-    % åŠ è½½æ•°æ®æ–‡ä»¶ï¼ˆæ”¯æŒå¤šé€‰ï¼‰ï¼Œå¹¶é‡å»ºâ€œæ•°æ®é¡¹åˆ—è¡¨â€
+    % ¼ÓÔØÊı¾İÎÄ¼ş£¨Ö§³Ö¶àÑ¡£©£¬²¢ÖØ½¨¡°Êı¾İÏîÁĞ±í¡±
     function txt = getGroupTitle(baseName, expanded)
         if expanded
             txt = ['[-] ' baseName];
@@ -843,7 +843,7 @@ onResize();
         finalizeLoadResult(app, loadedNow, failedNow, lastErr, 'file(s)');
     end
 
-    % ä¸»ç»˜å›¾å…¥å£ï¼šæŒ‰æ‰€é€‰æ•°æ®é¡¹ä¸å›¾ç±»å‹åˆ·æ–°ä¸‰å¹…å›¾
+    % Ö÷»æÍ¼Èë¿Ú£º°´ËùÑ¡Êı¾İÏîÓëÍ¼ÀàĞÍË¢ĞÂÈı·ùÍ¼
     function onLoadFolder(~, ~)
         app = getappdata(fig, 'app');
         startDir = app.lastOpenDir;
@@ -1021,7 +1021,7 @@ onResize();
         end
     end
 
-    % å°†æŒ‡å®šè½´å½“å‰å†…å®¹å¤åˆ¶åˆ°å•ç‹¬ Figureï¼Œä¾¿äºä¿å­˜å›¾ç‰‡
+    % ½«Ö¸¶¨Öáµ±Ç°ÄÚÈİ¸´ÖÆµ½µ¥¶À Figure£¬±ãÓÚ±£´æÍ¼Æ¬
     function onOpenAxisFigure(sourceAx, fallbackTitle)
         if countLineLikeChildren(sourceAx) == 0
             showAlertCompat(fig, 'Current plot is empty. Please plot data first.', 'Tip');
@@ -1054,12 +1054,12 @@ onResize();
         set(lblStatus, 'String', 'Status: opened foundation stiffness/coherence in one figure');
     end
 
-    % åœ¨é‡å‘½åè¾“å…¥æ¡†æŒ‰å›è½¦æ—¶è§¦å‘é‡å‘½å
+    % ÔÚÖØÃüÃûÊäÈë¿ò°´»Ø³µÊ±´¥·¢ÖØÃüÃû
     function onRenameEdited(~, ~)
         renameSelectedFromField(false);
     end
 
-    % ç”¨è¾“å…¥æ¡†å†…å®¹é‡å‘½åå½“å‰é€‰ä¸­æ•°æ®é¡¹ï¼ˆæ”¯æŒæç¤ºæ§åˆ¶ï¼‰
+    % ÓÃÊäÈë¿òÄÚÈİÖØÃüÃûµ±Ç°Ñ¡ÖĞÊı¾İÏî£¨Ö§³ÖÌáÊ¾¿ØÖÆ£©
     function renameSelectedFromField(showSelectionTips)
         app = getappdata(fig, 'app');
         selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
@@ -1102,7 +1102,7 @@ onResize();
         set(lblStatus, 'String', sprintf('Status: renamed "%s" to "%s"', S.label, renamedLabel));
     end
 
-    % æ›´æ–°å½“å‰é€‰ä¸­æ•°æ®é¡¹çš„æ—¶åŸŸå¹…å€¼ç¼©æ”¾å› å­ï¼ˆFactorï¼‰
+    % ¸üĞÂµ±Ç°Ñ¡ÖĞÊı¾İÏîµÄÊ±Óò·ùÖµËõ·ÅÒò×Ó£¨Factor£©
     function onScaleEdited(~, ~)
         app = getappdata(fig, 'app');
         selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
@@ -1127,7 +1127,7 @@ onResize();
         set(lblStatus, 'String', sprintf('Status: updated factor of "%s" to %g', S.label, scaleValue));
     end
 
-    % åˆ—è¡¨é€‰æ‹©å˜åŒ–æ—¶ï¼ŒåŒæ­¥åˆ·æ–° Rename/Factor è¾“å…¥æ¡†æ˜¾ç¤º
+    % ÁĞ±íÑ¡Ôñ±ä»¯Ê±£¬Í¬²½Ë¢ĞÂ Rename/Factor ÊäÈë¿òÏÔÊ¾
     function onDataSelectionChanged(~, ~)
         app = getappdata(fig, 'app');
         selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
@@ -1140,7 +1140,7 @@ onResize();
         end
     end
 
-    % æŒ‰ mode åœ¨æŒ‡å®šåæ ‡è½´ä¸Šç»˜å›¾ï¼ˆTime/PSD/Transï¼‰
+    % °´ mode ÔÚÖ¸¶¨×ø±êÖáÉÏ»æÍ¼£¨Time/PSD/Trans£©
     function [usedRef, statusMsg] = renderOneAxis(ax, mode, selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode, quantityMode)
         usedRef = NaN;
         statusMsg = '';
@@ -1478,7 +1478,7 @@ onResize();
         end
     end
 
-    % Hold å¼€å…³ï¼šæ§åˆ¶ Plot æ—¶æ˜¯è¿½åŠ è¿˜æ˜¯è¦†ç›–
+    % Hold ¿ª¹Ø£º¿ØÖÆ Plot Ê±ÊÇ×·¼Ó»¹ÊÇ¸²¸Ç
     function onHoldChanged(~, ~)
         if get(btnHold, 'Value')
             set(lblStatus, 'String', 'Status: Hold ON (next Plot will append)');
@@ -1487,14 +1487,14 @@ onResize();
         end
     end
 
-    % é‡ç½®æ»¤æ³¢å™¨å¼€å…³ï¼ˆä½é€š/é«˜é€šå…³é—­ï¼‰
+    % ÖØÖÃÂË²¨Æ÷¿ª¹Ø£¨µÍÍ¨/¸ßÍ¨¹Ø±Õ£©
     function onResetFilter(~, ~)
         set(chkLow, 'Value', 0);
         set(chkHigh, 'Value', 0);
         set(lblStatus, 'String', 'Status: filter reset to None');
     end
 
-    % æ¸…ç©ºä¸‰å¹…å›¾ï¼Œå¹¶æŒ‰å½“å‰å›¾ç±»å‹æ¢å¤ç©ºå›¾çŠ¶æ€
+    % Çå¿ÕÈı·ùÍ¼£¬²¢°´µ±Ç°Í¼ÀàĞÍ»Ö¸´¿ÕÍ¼×´Ì¬
     function onClearPlots(~, ~)
         cla(axMain1); cla(axMain2); cla(axMain3);
         cla(axFoundVib); cla(axFoundStiff); cla(axFoundCoh);
@@ -1506,7 +1506,7 @@ onResize();
         set(lblStatus, 'String', 'Status: plots cleared');
     end
 
-    % åˆ é™¤é€‰ä¸­çš„æ•°æ®é¡¹ï¼ˆä¼šä»å¯¹åº”æ–‡ä»¶æœ‰æ•ˆé€šé“ä¸­ç§»é™¤ï¼‰
+    % É¾³ıÑ¡ÖĞµÄÊı¾İÏî£¨»á´Ó¶ÔÓ¦ÎÄ¼şÓĞĞ§Í¨µÀÖĞÒÆ³ı£©
     function onDeleteSelectedFiles(~, ~)
         app = getappdata(fig, 'app');
         if isempty(app.series)
@@ -1567,7 +1567,7 @@ onResize();
         set(lblStatus, 'String', sprintf('Status: deleted %d entries, remaining %d', removed, numel(app.series)));
     end
 
-    % åˆ·æ–°å·¦ä¾§æ•°æ®é¡¹åˆ—è¡¨ï¼Œå¹¶å°½é‡ä¿ç•™åŸé€‰æ‹©
+    % Ë¢ĞÂ×ó²àÊı¾İÏîÁĞ±í£¬²¢¾¡Á¿±£ÁôÔ­Ñ¡Ôñ
     function refreshLoadedFilesList(selectedLabels)
         if nargin < 1
             selectedLabels = {};
@@ -1757,7 +1757,7 @@ onResize();
     end
 end
 
-% åˆ›å»ºåº”ç”¨çŠ¶æ€ç»“æ„ä½“ï¼ˆé›†ä¸­ä¿å­˜ UI å’Œæ•°æ®å¤„ç†çŠ¶æ€ï¼‰
+% ´´½¨Ó¦ÓÃ×´Ì¬½á¹¹Ìå£¨¼¯ÖĞ±£´æ UI ºÍÊı¾İ´¦Àí×´Ì¬£©
 function app = initAppState()
 app.loaded = false;
 app.filePath = '';
@@ -1782,7 +1782,7 @@ app.vna = struct( ...
     'xcmeas', []);
 end
 
-% æŒ‰æ–‡ä»¶æ‰©å±•åè¯»å–æ•°æ®å¹¶ç»Ÿä¸€è½¬æˆå†…éƒ¨æ•°æ®ç»“æ„
+% °´ÎÄ¼şÀ©Õ¹Ãû¶ÁÈ¡Êı¾İ²¢Í³Ò»×ª³ÉÄÚ²¿Êı¾İ½á¹¹
 function D = readVibrationFile(fileName, fsHint)
 [~, ~, ext] = fileparts(fileName);
 ext = lower(ext);
@@ -1806,7 +1806,7 @@ switch ext
 end
 end
 
-% è§£æ .vna/.mat ä¸­çš„ SLm ç»“æ„ï¼Œæå–æ—¶åŸŸä¸é¢‘åŸŸæ•°æ®
+% ½âÎö .vna/.mat ÖĞµÄ SLm ½á¹¹£¬ÌáÈ¡Ê±ÓòÓëÆµÓòÊı¾İ
 function D = parseVnaLikeStruct(S, fsHint, D)
 slm = [];
 if isfield(S, 'SLm')
@@ -1914,7 +1914,7 @@ D.rawByCh = rawByCh;
 D.vna = vna;
 end
 
-% å¯¹æ—¶åŸŸä¿¡å·åº”ç”¨ä½é€š/é«˜é€šæ»¤æ³¢ï¼ˆæ”¯æŒå•ç‹¬æˆ–åŒæ—¶ä½¿ç”¨ï¼‰
+% ¶ÔÊ±ÓòĞÅºÅÓ¦ÓÃµÍÍ¨/¸ßÍ¨ÂË²¨£¨Ö§³Öµ¥¶À»òÍ¬Ê±Ê¹ÓÃ£©
 function yDraw = applyFilterToSignal(yRaw, fs, useLow, lowCutoff, useHigh, highCutoff, order)
 yDraw = yRaw(:);
 if isempty(yDraw) || ~isfinite(fs) || fs <= 0
@@ -1946,7 +1946,7 @@ catch
 end
 end
 
-% è·å–æŸé€šé“ PSDï¼ˆä¼˜å…ˆä½¿ç”¨æ–‡ä»¶å†…é¢‘è°±ï¼Œå¦åˆ™å›é€€ FFTï¼‰
+% »ñÈ¡Ä³Í¨µÀ PSD£¨ÓÅÏÈÊ¹ÓÃÎÄ¼şÄÚÆµÆ×£¬·ñÔò»ØÍË FFT£©
 function [f, psd] = getPsdForChannel(F, ch)
 f = [];
 psd = [];
@@ -1974,7 +1974,7 @@ f = f(valid);
 psd = psd(valid);
 end
 
-% è®¡ç®—ä¼ é€’ç‡ï¼ˆé€šé“/å‚è€ƒé€šé“ï¼‰å¹¶è½¬æ¢ä¸º dB
+% ¼ÆËã´«µİÂÊ£¨Í¨µÀ/²Î¿¼Í¨µÀ£©²¢×ª»»Îª dB
 function [f, trDb] = getTransRatio(F, ch, refCh)
 f = [];
 trDb = [];
@@ -2048,7 +2048,7 @@ f = f0(valid);
 coh = c0(valid);
 end
 
-% è§£æé€šç”¨æ•°å€¼çŸ©é˜µæ–‡ä»¶ï¼ˆæ—¶é—´åˆ—/æ•°æ®åˆ—ï¼‰å¹¶æ¨æ–­é‡‡æ ·ç‡
+% ½âÎöÍ¨ÓÃÊıÖµ¾ØÕóÎÄ¼ş£¨Ê±¼äÁĞ/Êı¾İÁĞ£©²¢ÍÆ¶Ï²ÉÑùÂÊ
 % Parse time range inputs. Empty value means open-ended boundary.
 function [F, ok] = getFileById(files, fileId)
 F = [];
@@ -2086,7 +2086,7 @@ if ~ischar(raw)
     return;
 end
 
-txt = strtrim(strrep(raw, 'ï¼Œ', ','));
+txt = strtrim(strrep(raw, '£¬', ','));
 if isempty(txt)
     errMsg = 'Vib Ch cannot be empty. Example: 2,3,4';
     return;
@@ -2985,7 +2985,7 @@ else
 end
 end
 
-% è·å–å·¥ç¨‹å•ä½æ¢ç®—ç³»æ•° eu_valï¼ˆç¼ºçœä¸º 1ï¼‰
+% »ñÈ¡¹¤³Ìµ¥Î»»»ËãÏµÊı eu_val£¨È±Ê¡Îª 1£©
 function eu = getEuVal(sc)
 if isfield(sc, 'eu_val') && ~isempty(sc.eu_val) && isfinite(sc.eu_val)
     eu = sc.eu_val;
@@ -2994,7 +2994,7 @@ else
 end
 end
 
-% æ±‡æ€»æ‰€æœ‰å·²åŠ è½½æ–‡ä»¶ä¸­çš„æœ‰æ•ˆé€šé“å¹¶å»é‡
+% »ã×ÜËùÓĞÒÑ¼ÓÔØÎÄ¼şÖĞµÄÓĞĞ§Í¨µÀ²¢È¥ÖØ
 function valid = collectValidChannels(files)
 valid = [];
 for i = 1:numel(files)
@@ -3010,7 +3010,7 @@ else
 end
 end
 
-% ç”Ÿæˆé¡¶éƒ¨æ–‡ä»¶æ˜¾ç¤ºæ–‡æœ¬ï¼ˆå°‘é‡æ–‡ä»¶æ˜¾ç¤ºåç§°ï¼Œå¤šæ–‡ä»¶æ˜¾ç¤ºæ‘˜è¦ï¼‰
+% Éú³É¶¥²¿ÎÄ¼şÏÔÊ¾ÎÄ±¾£¨ÉÙÁ¿ÎÄ¼şÏÔÊ¾Ãû³Æ£¬¶àÎÄ¼şÏÔÊ¾ÕªÒª£©
 function txt = summarizeLoadedFiles(files)
 n = numel(files);
 if n <= 3
@@ -3024,7 +3024,7 @@ else
 end
 end
 
-% æ ¹æ®å·²åŠ è½½æ–‡ä»¶é‡å»ºâ€œæ•°æ®é¡¹åˆ—è¡¨â€ï¼ˆæ–‡ä»¶+é€šé“ï¼‰
+% ¸ù¾İÒÑ¼ÓÔØÎÄ¼şÖØ½¨¡°Êı¾İÏîÁĞ±í¡±£¨ÎÄ¼ş+Í¨µÀ£©
 function app = rebuildSeriesList(app)
 app = pruneCustomSeriesLabels(app);
 app = pruneCustomSeriesScales(app);
@@ -3055,7 +3055,7 @@ series = series(1:si);
 app.series = series;
 end
 
-% æ¸…ç†å·²å¤±æ•ˆçš„è‡ªå®šä¹‰åç§°æ˜ å°„ï¼ˆæ–‡ä»¶è¢«åˆ åï¼‰
+% ÇåÀíÒÑÊ§Ğ§µÄ×Ô¶¨ÒåÃû³ÆÓ³Éä£¨ÎÄ¼ş±»É¾ºó£©
 function app = pruneCustomSeriesLabels(app)
 if isempty(app.customSeriesNames)
     return;
@@ -3072,7 +3072,7 @@ end
 app.customSeriesNames = app.customSeriesNames(keep);
 end
 
-% æ¸…ç†å·²å¤±æ•ˆçš„è‡ªå®šä¹‰ç¼©æ”¾æ˜ å°„ï¼ˆæ–‡ä»¶è¢«åˆ åï¼‰
+% ÇåÀíÒÑÊ§Ğ§µÄ×Ô¶¨ÒåËõ·ÅÓ³Éä£¨ÎÄ¼ş±»É¾ºó£©
 function app = pruneCustomSeriesScales(app)
 if isempty(app.customSeriesScales)
     return;
@@ -3089,7 +3089,7 @@ end
 app.customSeriesScales = app.customSeriesScales(keep);
 end
 
-% è·å–æ•°æ®é¡¹åŸºç¡€æ˜¾ç¤ºåï¼ˆä¼˜å…ˆè‡ªå®šä¹‰åï¼Œå¦åˆ™æ–‡ä»¶å+é€šé“ï¼‰
+% »ñÈ¡Êı¾İÏî»ù´¡ÏÔÊ¾Ãû£¨ÓÅÏÈ×Ô¶¨ÒåÃû£¬·ñÔòÎÄ¼şÃû+Í¨µÀ£©
 function label = getSeriesBaseLabel(app, F, ch)
 label = getCustomSeriesLabel(app, F.id, ch);
 if isempty(label)
@@ -3097,7 +3097,7 @@ if isempty(label)
 end
 end
 
-% æŸ¥è¯¢æŒ‡å®šæ–‡ä»¶+é€šé“çš„è‡ªå®šä¹‰æ˜¾ç¤ºå
+% ²éÑ¯Ö¸¶¨ÎÄ¼ş+Í¨µÀµÄ×Ô¶¨ÒåÏÔÊ¾Ãû
 function name = getSeriesDisplayFileName(fileName)
 name = fileName;
 if iscell(name)
@@ -3146,7 +3146,7 @@ for i = 1:numel(app.customSeriesNames)
 end
 end
 
-% è®¾ç½®/æ›´æ–°æŒ‡å®šæ–‡ä»¶+é€šé“çš„è‡ªå®šä¹‰æ˜¾ç¤ºå
+% ÉèÖÃ/¸üĞÂÖ¸¶¨ÎÄ¼ş+Í¨µÀµÄ×Ô¶¨ÒåÏÔÊ¾Ãû
 function app = setCustomSeriesLabel(app, fileId, ch, label)
 found = false;
 for i = 1:numel(app.customSeriesNames)
@@ -3162,7 +3162,7 @@ if ~found
 end
 end
 
-% è·å–æŒ‡å®šæ•°æ®é¡¹çš„æ—¶åŸŸç¼©æ”¾å› å­ï¼ˆFactorï¼‰
+% »ñÈ¡Ö¸¶¨Êı¾İÏîµÄÊ±ÓòËõ·ÅÒò×Ó£¨Factor£©
 function scaleValue = getSeriesScale(app, S)
 fileId = getSeriesFileId(S, app);
 scaleValue = 1;
@@ -3178,7 +3178,7 @@ for i = 1:numel(app.customSeriesScales)
 end
 end
 
-% è®¾ç½®/æ›´æ–°æŒ‡å®šæ•°æ®é¡¹çš„æ—¶åŸŸç¼©æ”¾å› å­ï¼ˆFactorï¼‰
+% ÉèÖÃ/¸üĞÂÖ¸¶¨Êı¾İÏîµÄÊ±ÓòËõ·ÅÒò×Ó£¨Factor£©
 function app = setCustomSeriesScale(app, fileId, ch, scaleValue)
 found = false;
 for i = 1:numel(app.customSeriesScales)
@@ -3194,7 +3194,7 @@ if ~found
 end
 end
 
-% æ ¹æ® fileId+é€šé“åœ¨å½“å‰ series ä¸­æŸ¥æ‰¾å®é™…æ˜¾ç¤ºå
+% ¸ù¾İ fileId+Í¨µÀÔÚµ±Ç° series ÖĞ²éÕÒÊµ¼ÊÏÔÊ¾Ãû
 function label = findSeriesLabel(series, fileId, ch, fallback)
 label = fallback;
 for i = 1:numel(series)
@@ -3205,7 +3205,7 @@ for i = 1:numel(series)
 end
 end
 
-% ä» series æ¡ç›®è§£æ fileIdï¼ˆå…¼å®¹æ—§å­—æ®µï¼‰
+% ´Ó series ÌõÄ¿½âÎö fileId£¨¼æÈİ¾É×Ö¶Î£©
 function fileId = getSeriesFileId(S, app)
 if isfield(S, 'fileId') && ~isempty(S.fileId)
     fileId = S.fileId;
@@ -3222,7 +3222,7 @@ if isfield(S, 'fileIdx') && ~isempty(S.fileIdx)
 end
 end
 
-% æŒ‰æ˜¾ç¤ºåä» series ä¸­ç­›é€‰å‡ºå·²é€‰æ•°æ®é¡¹
+% °´ÏÔÊ¾Ãû´Ó series ÖĞÉ¸Ñ¡³öÒÑÑ¡Êı¾İÏî
 function selectedSeries = getSelectedSeries(series, selectedLabels)
 if isempty(series) || isempty(selectedLabels)
     selectedSeries = {};
@@ -3239,7 +3239,7 @@ for i = 1:numel(series)
 end
 end
 
-% è‹¥ç›®æ ‡é€šé“æ— æ•ˆï¼Œåˆ™é€‰æ‹©æœ€æ¥è¿‘çš„æœ‰æ•ˆé€šé“
+% ÈôÄ¿±êÍ¨µÀÎŞĞ§£¬ÔòÑ¡Ôñ×î½Ó½üµÄÓĞĞ§Í¨µÀ
 function ch = chooseNearestValid(chIn, validList)
 if isempty(validList)
     ch = 1;
@@ -3253,7 +3253,7 @@ end
 ch = validList(i);
 end
 
-% å®‰å…¨è¯»å– cell æŒ‡å®šå…ƒç´ ï¼ˆè¶Šç•Œè¿”å›ç©ºï¼‰
+% °²È«¶ÁÈ¡ cell Ö¸¶¨ÔªËØ£¨Ô½½ç·µ»Ø¿Õ£©
 function x = safeCellGet(c, idx)
 if idx >= 1 && idx <= numel(c)
     x = c{idx};
@@ -3262,7 +3262,7 @@ else
 end
 end
 
-% å®‰å…¨è¯»å–æ•°ç»„æŒ‡å®šå…ƒç´ ï¼ˆè¶Šç•Œæˆ–æ— æ•ˆè¿”å›é»˜è®¤å€¼ï¼‰
+% °²È«¶ÁÈ¡Êı×éÖ¸¶¨ÔªËØ£¨Ô½½ç»òÎŞĞ§·µ»ØÄ¬ÈÏÖµ£©
 function v = safeGet(arr, idx, fallback)
 if idx >= 1 && idx <= numel(arr) && isfinite(arr(idx))
     v = arr(idx);
@@ -3271,7 +3271,7 @@ else
 end
 end
 
-% è¿‡æ»¤æ— æ•ˆç‚¹åæ‰§è¡Œçº¿æ€§ plot
+% ¹ıÂËÎŞĞ§µãºóÖ´ĞĞÏßĞÔ plot
 function safePlot(ax, x, y, varargin)
 valid = isfinite(x) & isfinite(y);
 x = x(valid);
@@ -3282,7 +3282,7 @@ end
 plot(ax, x, y, varargin{:});
 end
 
-% è¿‡æ»¤æ— æ•ˆç‚¹åæ‰§è¡Œ semilogx
+% ¹ıÂËÎŞĞ§µãºóÖ´ĞĞ semilogx
 function safeSemilogx(ax, x, y, varargin)
 valid = isfinite(x) & isfinite(y) & (x > 0);
 x = x(valid);
@@ -3293,7 +3293,7 @@ end
 semilogx(ax, x, y, varargin{:});
 end
 
-% è¿‡æ»¤æ— æ•ˆç‚¹åæ‰§è¡Œ loglog
+% ¹ıÂËÎŞĞ§µãºóÖ´ĞĞ loglog
 function safeLoglog(ax, x, y, varargin)
 valid = isfinite(x) & isfinite(y) & (x > 0) & (y > 0);
 x = x(valid);
@@ -3304,7 +3304,7 @@ end
 loglog(ax, x, y, varargin{:});
 end
 
-% ç»Ÿä¸€æ›²çº¿è°ƒè‰²æ¿ï¼ˆä¿è¯å¤šæ›²çº¿é¢œè‰²å¯åŒºåˆ†ï¼‰
+% Í³Ò»ÇúÏßµ÷É«°å£¨±£Ö¤¶àÇúÏßÑÕÉ«¿ÉÇø·Ö£©
 function c = getSeriesColor(idx)
 palette = [ ...
     0.0000 0.4470 0.7410; ...
@@ -3322,7 +3322,7 @@ idx = mod(round(idx) - 1, size(palette, 1)) + 1;
 c = palette(idx, :);
 end
 
-% ç»Ÿè®¡åæ ‡è½´ä¸­ line å¯¹è±¡æ•°é‡ï¼ˆç”¨äºé¢œè‰²ç»­æ¥ï¼‰
+% Í³¼Æ×ø±êÖáÖĞ line ¶ÔÏóÊıÁ¿£¨ÓÃÓÚÑÕÉ«Ğø½Ó£©
 function n = countLineLikeChildren(ax)
 n = 0;
 try
@@ -3338,7 +3338,7 @@ catch
 end
 end
 
-% ç”Ÿæˆå•ç‹¬å¯¼å‡ºå›¾çª—æ ‡é¢˜ï¼ˆä¼˜å…ˆä½¿ç”¨è½´æ ‡é¢˜ï¼‰
+% Éú³Éµ¥¶Àµ¼³öÍ¼´°±êÌâ£¨ÓÅÏÈÊ¹ÓÃÖá±êÌâ£©
 function figName = getAxisExportTitle(ax, fallbackTitle)
 figName = fallbackTitle;
 try
@@ -3353,7 +3353,7 @@ catch
 end
 end
 
-% å¤åˆ¶å½“å‰è½´å†…å®¹åˆ°æ–° Figureï¼ˆç”¨äºå•å›¾ä¿å­˜ï¼‰
+% ¸´ÖÆµ±Ç°ÖáÄÚÈİµ½ĞÂ Figure£¨ÓÃÓÚµ¥Í¼±£´æ£©
 function cloneAxisToFigure(sourceAx, figName, legendLoc)
 if nargin < 3 || isempty(legendLoc)
     legendLoc = 'northeast';
@@ -3372,7 +3372,7 @@ copyAxisContent(sourceAx, newAx, legendLoc);
 enableInteractiveFigureCompat(hFig);
 end
 
-% å°†ä¸¤ä¸ªåæ ‡è½´å¤åˆ¶åˆ°åŒä¸€ Figure çš„ subplot(211/212) ä¸­
+% ½«Á½¸ö×ø±êÖá¸´ÖÆµ½Í¬Ò» Figure µÄ subplot(211/212) ÖĞ
 function cloneTwoAxesToFigure(sourceAxTop, sourceAxBottom, figName, legendLoc)
 if nargin < 4 || isempty(legendLoc)
     legendLoc = 'northeast';
@@ -3394,7 +3394,7 @@ copyAxisContent(sourceAxBottom, newAxBottom, legendLoc);
 enableInteractiveFigureCompat(hFig);
 end
 
-% å¤åˆ¶åæ ‡è½´å†…å®¹åŠæ ·å¼åˆ°ç›®æ ‡è½´
+% ¸´ÖÆ×ø±êÖáÄÚÈİ¼°ÑùÊ½µ½Ä¿±êÖá
 function copyAxisContent(sourceAx, targetAx, legendLoc)
 if nargin < 3 || isempty(legendLoc)
     legendLoc = 'northeast';
@@ -3429,7 +3429,7 @@ catch
 end
 end
 
-% æŒ‰æ˜¾ç¤ºåæ¢å¤åˆ—è¡¨é€‰ä¸­é¡¹ï¼ˆæ‰¾ä¸åˆ°åˆ™å›é€€é»˜è®¤ï¼‰
+% °´ÏÔÊ¾Ãû»Ö¸´ÁĞ±íÑ¡ÖĞÏî£¨ÕÒ²»µ½Ôò»ØÍËÄ¬ÈÏ£©
 function setListSelectionByLabels(h, items, selectedLabels)
 if isempty(items)
     set(h, 'Value', 1);
@@ -3456,7 +3456,7 @@ end
 set(h, 'Value', unique(idx, 'stable'));
 end
 
-% åˆ¤æ–­å‘é‡æ˜¯å¦åƒæ—¶é—´è½´ï¼ˆå•è°ƒé€’å¢ä¸”æ­¥é•¿è¿‘ä¼¼æ’å®šï¼‰
+% ÅĞ¶ÏÏòÁ¿ÊÇ·ñÏñÊ±¼äÖá£¨µ¥µ÷µİÔöÇÒ²½³¤½üËÆºã¶¨£©
 function tf = isTimeLike(v)
 v = v(:);
 if numel(v) < 3 || any(~isfinite(v))
@@ -3467,14 +3467,14 @@ d = diff(v);
 tf = all(d > 0) && (std(d) / max(mean(d), eps) < 1e-2);
 end
 
-% æ ¡éªŒé‡‡æ ·ç‡è¾“å…¥æ˜¯å¦æœ‰æ•ˆ
+% Ğ£Ñé²ÉÑùÂÊÊäÈëÊÇ·ñÓĞĞ§
 function validateFs(fs)
 if isempty(fs) || ~isfinite(fs) || fs <= 0
     error('Invalid Fs. Please input a valid sampling frequency.');
 end
 end
 
-% è®¡ç®—å•è¾¹å¹…å€¼è°±ï¼ˆFFTï¼‰
+% ¼ÆËãµ¥±ß·ùÖµÆ×£¨FFT£©
 function [f, amp] = singleSideSpectrum(y, fs)
 y = y(:);
 N = numel(y);
@@ -3489,7 +3489,7 @@ f = fs * (0:floor(N / 2))' / N;
 amp = P1(:);
 end
 
-% ä»ç¼–è¾‘æ¡†è¯»å–æ•°å€¼ï¼Œå¤±è´¥æ—¶è¿”å› fallback
+% ´Ó±à¼­¿ò¶ÁÈ¡ÊıÖµ£¬Ê§°ÜÊ±·µ»Ø fallback
 function v = getNumericControlValue(h, fallback)
 v = fallback;
 try
@@ -3505,7 +3505,7 @@ catch
 end
 end
 
-% å‘ç¼–è¾‘æ¡†å†™å…¥æ•°å€¼æ–‡æœ¬
+% Ïò±à¼­¿òĞ´ÈëÊıÖµÎÄ±¾
 function setNumericControlValue(h, v)
 try
     set(h, 'String', num2str(v));
@@ -3513,7 +3513,7 @@ catch
 end
 end
 
-% è·å–ä¸‹æ‹‰æ¡†å½“å‰é€‰ä¸­çš„å›¾ç±»å‹å­—ç¬¦ä¸²
+% »ñÈ¡ÏÂÀ­¿òµ±Ç°Ñ¡ÖĞµÄÍ¼ÀàĞÍ×Ö·û´®
 function mode = getPopupSelection(h)
 items = getCellStringCompat(get(h, 'String'));
 idx = get(h, 'Value');
@@ -3525,7 +3525,7 @@ idx = max(1, min(numel(items), idx));
 mode = items{idx};
 end
 
-% è·å–åˆ—è¡¨å½“å‰é€‰ä¸­é¡¹å¯¹åº”çš„å­—ç¬¦ä¸²é›†åˆ
+% »ñÈ¡ÁĞ±íµ±Ç°Ñ¡ÖĞÏî¶ÔÓ¦µÄ×Ö·û´®¼¯ºÏ
 function labels = getSelectedListLabels(h)
 items = getCellStringCompat(get(h, 'String'));
 idx = get(h, 'Value');
@@ -3538,7 +3538,7 @@ labels = items(idx);
 labels = labels(~cellfun(@isempty, labels));
 end
 
-% å…¼å®¹ char/cell/string çš„å­—ç¬¦ä¸²åˆ—è¡¨è½¬æ¢
+% ¼æÈİ char/cell/string µÄ×Ö·û´®ÁĞ±í×ª»»
 function items = getCellStringCompat(raw)
 if isempty(raw)
     items = {};
@@ -3551,12 +3551,12 @@ else
 end
 end
 
-% å…¼å®¹ç›®å½•å­˜åœ¨æ€§æ£€æŸ¥ï¼ˆé€‚é…è€ç‰ˆæœ¬ MATLABï¼‰
+% ¼æÈİÄ¿Â¼´æÔÚĞÔ¼ì²é£¨ÊÊÅäÀÏ°æ±¾ MATLAB£©
 function tf = isDirCompat(p)
 tf = ischar(p) && exist(p, 'dir') == 7;
 end
 
-% ç»Ÿä¸€å¼¹çª—æç¤ºï¼ˆuialert ä¸å¯ç”¨æ—¶å›é€€ errordlgï¼‰
+% Í³Ò»µ¯´°ÌáÊ¾£¨uialert ²»¿ÉÓÃÊ±»ØÍË errordlg£©
 function showAlertCompat(figHandle, msg, ttl)
 try
     uialert(figHandle, msg, ttl);
@@ -3565,7 +3565,7 @@ catch
 end
 end
 
-% å…¼å®¹åˆ¤æ–­â€œæ˜¯å¦ä¸ºæ–‡æœ¬æ ‡é‡â€
+% ¼æÈİÅĞ¶Ï¡°ÊÇ·ñÎªÎÄ±¾±êÁ¿¡±
 function tf = isTextScalarCompat(v)
 tf = ischar(v);
 if tf
@@ -3578,7 +3578,7 @@ catch
 end
 end
 
-% å…¼å®¹è¯»å–æ•°å€¼çŸ©é˜µï¼ˆæ–°ç‰ˆæœ¬ readmatrixï¼Œæ—§ç‰ˆæœ¬å›é€€ï¼‰
+% ¼æÈİ¶ÁÈ¡ÊıÖµ¾ØÕó£¨ĞÂ°æ±¾ readmatrix£¬¾É°æ±¾»ØÍË£©
 function X = readMatrixCompat(fileName)
 if exist('readmatrix', 'file') == 2
     X = readmatrix(fileName);
@@ -3595,7 +3595,7 @@ switch ext
 end
 end
 
-% è®¾ç½®å›¾çª—æ¸²æŸ“å™¨ï¼ˆä¼˜å…ˆ paintersï¼Œæå‡å¯¼å‡ºç¨³å®šæ€§ï¼‰
+% ÉèÖÃÍ¼´°äÖÈ¾Æ÷£¨ÓÅÏÈ painters£¬ÌáÉıµ¼³öÎÈ¶¨ĞÔ£©
 function setFigureRendererCompat(hFig)
 try
     set(hFig, 'Renderer', 'painters');
@@ -3603,7 +3603,7 @@ catch
 end
 end
 
-% æ‰“å¼€å›¾çª—äº¤äº’èƒ½åŠ›ï¼ˆç¼©æ”¾ã€å¹³ç§»ã€æ•°æ®å…‰æ ‡ï¼‰
+% ´ò¿ªÍ¼´°½»»¥ÄÜÁ¦£¨Ëõ·Å¡¢Æ½ÒÆ¡¢Êı¾İ¹â±ê£©
 function enableInteractiveFigureCompat(hFig)
 try
     zoom(hFig, 'on');
@@ -3620,7 +3620,7 @@ catch
 end
 end
 
-% ç»Ÿä¸€åæ ‡è½´æ ·å¼ï¼ˆè¾¹æ¡†ã€å­—ä½“ã€è¾¹è·ï¼‰
+% Í³Ò»×ø±êÖáÑùÊ½£¨±ß¿ò¡¢×ÖÌå¡¢±ß¾à£©
 function styleAxisCompat(ax)
 try
     set(ax, 'Box', 'on', 'LineWidth', 1.0, 'FontSize', 10, ...

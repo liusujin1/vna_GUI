@@ -25,16 +25,22 @@ function view_modal_shape()
     app.previewTimer = [];
     app.previewPhaseIndex = 0;
     app.isLegacyMatlab = isLegacyMatlabRelease();
+    app.minFigureSize = [1220 760];
 
     % 主窗口与左右两大面板：左侧负责数据编辑，右侧负责 FRF 与振型预览。
+    screenSz = get(0, 'ScreenSize');
+    figW = max(app.minFigureSize(1), min(round(screenSz(3) * 0.90), 1500));
+    figH = max(app.minFigureSize(2), min(round(screenSz(4) * 0.88), 960));
+    figX = max(20, round((screenSz(3) - figW) / 2));
+    figY = max(20, round((screenSz(4) - figH) / 2));
     fig = figure( ...
         'Name', '模态振型查看器', ...
         'NumberTitle', 'off', ...
         'MenuBar', 'none', ...
         'ToolBar', 'none', ...
         'Color', [0.94 0.94 0.94], ...
-        'Units', 'normalized', ...
-        'Position', [0.05 0.05 0.90 0.86], ...
+        'Units', 'pixels', ...
+        'Position', [figX figY figW figH], ...
         'CloseRequestFcn', @onCloseFigure);
 
     pnlLeft = uipanel( ...
@@ -386,6 +392,15 @@ function view_modal_shape()
     end
 
     function onFigureResized(~, ~)
+        try
+            figPos = getpixelposition(fig);
+            newW = max(app.minFigureSize(1), figPos(3));
+            newH = max(app.minFigureSize(2), figPos(4));
+            if newW ~= figPos(3) || newH ~= figPos(4)
+                setpixelposition(fig, [figPos(1), figPos(2), newW, newH]);
+            end
+        catch
+        end
         layoutModePanel();
     end
 
@@ -1087,6 +1102,7 @@ function view_modal_shape()
         mode.coh = cohVals;
         mode.scale = scale;
         mode.lines = activeLineRows(app.lines);
+        mode.previewBounds = computeModePreviewBounds(coords, dispComplex, scale);
     end
 
     % 同一 PointID 可由多行/多文件共同组成，按方向质量合并为一个三向测点。
@@ -1447,7 +1463,7 @@ function view_modal_shape()
             end
         end
         hold(ax, 'off');
-        styleStructureAxis(ax, [coords; coordsDef], viewState);
+        styleStructureAxis(ax, [coords; coordsDef], viewState, mode.previewBounds);
         hidePreviewAxis(ax);
         title(ax, sprintf('振型预览 - 请求 %.4g Hz / 实际 %.4g Hz', mode.requestedFreq, mode.actualFreq));
     end
@@ -1986,38 +2002,82 @@ function view_modal_shape()
     end
 
     % 统一控制结构图的显示范围、等比例缩放和视角恢复。
-    function styleStructureAxis(ax, coords, viewState)
+    function styleStructureAxis(ax, coords, viewState, fixedBounds)
         if nargin < 3
             viewState = [];
         end
+        if nargin < 4
+            fixedBounds = [];
+        end
         if isempty(coords)
-            axis(ax, 'equal');
+            set(ax, 'XLimMode', 'manual', 'YLimMode', 'manual', 'ZLimMode', 'manual');
+            daspect(ax, [1 1 1]);
             if numel(viewState) ~= 2 || any(~isfinite(viewState))
                 view(ax, 3);
             else
                 view(ax, viewState(1), viewState(2));
             end
+            axis(ax, 'vis3d');
             grid(ax, 'off');
             return;
         end
-        mins = min(coords, [], 1);
-        maxs = max(coords, [], 1);
+        if ~isempty(fixedBounds) && isstruct(fixedBounds) ...
+                && all(isfield(fixedBounds, {'mins', 'maxs'})) ...
+                && numel(fixedBounds.mins) == 3 && numel(fixedBounds.maxs) == 3 ...
+                && all(isfinite(fixedBounds.mins)) && all(isfinite(fixedBounds.maxs))
+            mins = fixedBounds.mins(:).';
+            maxs = fixedBounds.maxs(:).';
+        else
+            mins = min(coords, [], 1);
+            maxs = max(coords, [], 1);
+        end
         span = max(maxs - mins);
         if ~isfinite(span) || span <= 0
             span = 1;
         end
         center = 0.5 * (mins + maxs);
         half = 0.60 * span;
+        set(ax, 'XLimMode', 'manual', 'YLimMode', 'manual', 'ZLimMode', 'manual');
         xlim(ax, center(1) + [-half half]);
         ylim(ax, center(2) + [-half half]);
         zlim(ax, center(3) + [-half half]);
-        axis(ax, 'equal');
+        daspect(ax, [1 1 1]);
+        axis(ax, 'vis3d');
         if numel(viewState) ~= 2 || any(~isfinite(viewState))
             view(ax, 3);
         else
             view(ax, viewState(1), viewState(2));
         end
         grid(ax, 'off');
+    end
+
+    function bounds = computeModePreviewBounds(coords, dispComplex, scale)
+        if nargin < 3 || ~isfinite(scale)
+            scale = 1;
+        end
+        coords = coords(:, 1:3);
+        amp = abs(scale * dispComplex(:, 1:3));
+        amp(~isfinite(amp)) = 0;
+        mins = min(coords - amp, [], 1);
+        maxs = max(coords + amp, [], 1);
+        bounds = struct('mins', mins, 'maxs', maxs);
+    end
+
+    % rotate3d 在新老版本调用形式不同，这里统一封装兼容入口。
+    function enableFigureRotate3d(figHandle)
+        try
+            if app.isLegacyMatlab
+                hRotate = rotate3d(figHandle);
+                set(hRotate, 'Enable', 'on');
+            else
+                rotate3d(figHandle, 'on');
+            end
+        catch
+            try
+                rotate3d on;
+            catch
+            end
+        end
     end
 
     function hidePreviewAxis(ax)
@@ -2278,7 +2338,7 @@ function view_modal_shape()
                 coords([idx1 idx2], 1), ...
                 coords([idx1 idx2], 2), ...
                 coords([idx1 idx2], 3), ...
-                '-', 'Color', colorVal, 'LineWidth', lineWidth, 'HitTest', 'off');
+                '-', 'Color', colorVal, 'LineWidth', lineWidth);
         end
     end
 
@@ -2804,23 +2864,6 @@ function view_modal_shape()
             tf = verLessThan('matlab', '9.2');
         catch
             tf = false;
-        end
-    end
-
-    % rotate3d 在新老版本调用形式不同，这里统一封装兼容入口。
-    function enableFigureRotate3d(figHandle)
-        try
-            if app.isLegacyMatlab
-                hRotate = rotate3d(figHandle);
-                set(hRotate, 'Enable', 'on');
-            else
-                rotate3d(figHandle, 'on');
-            end
-        catch
-            try
-                rotate3d on;
-            catch
-            end
         end
     end
 

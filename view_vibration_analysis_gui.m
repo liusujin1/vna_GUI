@@ -73,7 +73,8 @@ edtFsNum = uicontrol('Parent', panel, 'Style', 'edit', ...
     'String', '5000', ...
     'BackgroundColor', 'w', ...
     'Position', [103 484 82 28], ...
-    'Enable', 'off');
+    'Enable', 'off', ...
+    'Callback', @onApplyFsNumerator);
 btnApplyFs = uicontrol('Parent', panel, 'Style', 'pushbutton', ...
     'String', 'Apply', ...
     'Position', [195 484 60 28], ...
@@ -85,21 +86,34 @@ lblFsHint = uicontrol('Parent', panel, 'Style', 'text', ...
     'Position', [15 462 240 18]);
 
 grpFreq = uipanel('Parent', panel, 'Title', 'Frequency Settings', ...
-    'Units', 'pixels', 'Position', [15 362 330 90]);
-lblPair = uicontrol('Parent', grpFreq, 'Style', 'text', ...
-    'String', 'Pair:', ...
+    'Units', 'pixels', 'Position', [15 362 330 148]);
+lblFreqPlotMode = uicontrol('Parent', grpFreq, 'Style', 'text', ...
+    'String', 'Plot Mode:', ...
     'HorizontalAlignment', 'left', ...
-    'Position', [12 42 40 20]);
-ddPair = uicontrol('Parent', grpFreq, 'Style', 'popupmenu', ...
-    'String', {'(none)'}, ...
+    'Position', [12 112 60 20]);
+ddFreqPlotMode = uicontrol('Parent', grpFreq, 'Style', 'popupmenu', ...
+    'String', {'Overlay', 'Subplots'}, ...
     'Value', 1, ...
     'BackgroundColor', 'w', ...
-    'Position', [55 40 255 24], ...
-    'Callback', @onPairChanged);
-lblFreqInfo = uicontrol('Parent', grpFreq, 'Style', 'text', ...
-    'String', 'Select one or more frequency files to overlay.', ...
+    'Position', [76 110 234 24], ...
+    'Callback', @onFreqPlotModeChanged);
+lblFreqChannels = uicontrol('Parent', grpFreq, 'Style', 'text', ...
+    'String', 'Channels:', ...
     'HorizontalAlignment', 'left', ...
-    'Position', [12 10 300 18]);
+    'Position', [12 84 55 20]);
+lstFreqPairs = uicontrol('Parent', grpFreq, 'Style', 'listbox', ...
+    'String', {'(none)'}, ...
+    'Value', 1, ...
+    'Min', 0, ...
+    'Max', 2, ...
+    'BackgroundColor', 'w', ...
+    'Position', [12 12 298 70], ...
+    'Callback', @onFreqChannelsChanged);
+lblFreqInfo = uicontrol('Parent', grpFreq, 'Style', 'text', ...
+    'String', '', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [12 132 300 1], ...
+    'Visible', 'off');
 
 grpLog = uipanel('Parent', panel, 'Title', 'Log Settings', ...
     'Units', 'pixels', 'Position', [15 155 330 197]);
@@ -191,7 +205,7 @@ catch
 end
 
 lblFreqSelected = uicontrol('Parent', tabFreq, 'Style', 'text', ...
-    'String', 'Selected pair overlay', ...
+    'String', 'Selected frequency channels', ...
     'HorizontalAlignment', 'left', ...
     'Position', [20 785 480 20]);
 btnMagFigure = uicontrol('Parent', tabFreq, 'Style', 'pushbutton', ...
@@ -201,22 +215,15 @@ btnPhaseFigure = uicontrol('Parent', tabFreq, 'Style', 'pushbutton', ...
     'String', 'Figure', ...
     'Position', [910 387 60 26]);
 
-axMag = axes('Parent', tabFreq, 'Units', 'pixels', ...
-    'Position', [20 435 1010 330], 'Box', 'on');
-title(axMag, 'Magnitude (dB)');
-ylabel(axMag, 'Magnitude (dB)');
-set(axMag, 'XScale', 'log');
-grid(axMag, 'on');
+pnlMagArea = uipanel('Parent', tabFreq, 'BorderType', 'none', ...
+    'Units', 'pixels', 'Position', [20 435 1010 330]);
+axMag = createFrequencyHostAxis(pnlMagArea, 'Magnitude (dB)', 'Magnitude (dB)');
 
-axPhase = axes('Parent', tabFreq, 'Units', 'pixels', ...
-    'Position', [20 40 1010 330], 'Box', 'on');
-title(axPhase, 'Phase (deg)');
-xlabel(axPhase, 'Frequency (Hz)');
-ylabel(axPhase, 'Phase (deg)');
-set(axPhase, 'XScale', 'log');
-grid(axPhase, 'on');
-set(btnMagFigure, 'Callback', @(~, ~) onOpenAxisFigure(axMag, 'Frequency Magnitude'));
-set(btnPhaseFigure, 'Callback', @(~, ~) onOpenAxisFigure(axPhase, 'Frequency Phase'));
+pnlPhaseArea = uipanel('Parent', tabFreq, 'BorderType', 'none', ...
+    'Units', 'pixels', 'Position', [20 40 1010 330]);
+axPhase = createFrequencyHostAxis(pnlPhaseArea, 'Phase (deg)', 'Phase (deg)');
+set(btnMagFigure, 'Callback', @(~, ~) onOpenCurrentFrequencyViewFigure('mag'));
+set(btnPhaseFigure, 'Callback', @(~, ~) onOpenCurrentFrequencyViewFigure('phase'));
 
 lblLogSelected = uicontrol('Parent', tabLog, 'Style', 'text', ...
     'String', 'Active log file', ...
@@ -356,6 +363,15 @@ set(fig, 'ResizeFcn', @onResize);
         setApp(app);
         refreshFileList(selIds);
         refreshContextControls();
+        if hasSelectedFrequencyFile()
+            if app.holdPlots
+                app.holdPlots = false;
+                setApp(app);
+                set(btnHold, 'Value', 0, 'String', 'Hold: Off');
+                updateHoldControlState();
+            end
+            plotFrequencyPage();
+        end
         setStatus(sprintf('Status: applied Fs numerator %.6g to %d frequency file(s).', fsNum, numel(freqIdx)));
     end
 
@@ -369,7 +385,19 @@ set(fig, 'ResizeFcn', @onResize);
         autoPlotCurrentSelection();
     end
 
-    function onPairChanged(~, ~)
+    function onFreqPlotModeChanged(~, ~)
+        app = getApp();
+        app.freqPlotMode = getPopupSelectedString(ddFreqPlotMode);
+        if strcmp(app.freqPlotMode, 'Subplots')
+            app.holdPlots = false;
+            set(btnHold, 'Value', 0, 'String', 'Hold: Off');
+        end
+        setApp(app);
+        updateHoldControlState();
+        autoPlotCurrentSelection();
+    end
+
+    function onFreqChannelsChanged(~, ~)
         autoPlotCurrentSelection();
     end
 
@@ -429,27 +457,13 @@ set(fig, 'ResizeFcn', @onResize);
     end
 
     function onClearPlots(~, ~)
-        clearAxisAndLegend(axMag);
-        clearAxisAndLegend(axPhase);
+        clearFrequencyRenderArea(true);
         clearLogRenderArea(true);
-        title(axMag, 'Magnitude (dB)');
-        title(axPhase, 'Phase (deg)');
-        xlabel(axMag, 'Frequency (Hz)');
-        xlabel(axPhase, 'Frequency (Hz)');
-        ylabel(axMag, 'Magnitude (dB)');
-        ylabel(axPhase, 'Phase (deg)');
-        set(axMag, 'XScale', 'log');
-        set(axPhase, 'XScale', 'log');
-        grid(axMag, 'on');
-        grid(axPhase, 'on');
         app = getApp();
+        app.lastFreqRender = [];
         app.lastLogRender = [];
         setApp(app);
         setStatus('Status: cleared all plots.');
-    end
-
-    function onOpenAxisFigure(sourceAx, fallbackTitle)
-        cloneAxisToFigure(sourceAx, fallbackTitle);
     end
 
     function onOpenCurrentLogViewFigure(~, ~)
@@ -459,6 +473,15 @@ set(fig, 'ResizeFcn', @onResize);
             return;
         end
         renderCurrentLogViewInFigure(app.lastLogRender);
+    end
+
+    function onOpenCurrentFrequencyViewFigure(viewKind)
+        app = getApp();
+        if isempty(app.lastFreqRender)
+            setStatus('Status: no current frequency view to open.');
+            return;
+        end
+        renderCurrentFrequencyViewInFigure(app.lastFreqRender, viewKind);
     end
 
     function autoPlotCurrentSelection()
@@ -540,12 +563,6 @@ set(fig, 'ResizeFcn', @onResize);
         set(btnApplyFs, 'Position', [xPad + 180 fsRowY 60 28]);
         set(lblFsHint, 'Position', [xPad fsRowY - 24 contentW 18]);
 
-        freqY = fsRowY - 122;
-        set(grpFreq, 'Position', [xPad freqY contentW 90]);
-        set(lblPair, 'Position', [12 42 40 20]);
-        set(ddPair, 'Position', [55 40 contentW - 75 24]);
-        set(lblFreqInfo, 'Position', [12 10 contentW - 20 18]);
-
         statusY = 18;
         statusH = 78;
         actionY = statusY + statusH + 12;
@@ -555,10 +572,19 @@ set(fig, 'ResizeFcn', @onResize);
         set(btnHold, 'Position', [xPad + 2 * (actionW + btnGap) actionY actionW rowH]);
         set(lblStatus, 'Position', [xPad statusY contentW statusH]);
 
-        logBottom = actionY + rowH + 14;
-        logTop = freqY - 12;
-        logH = max(130, logTop - logBottom);
-        set(grpLog, 'Position', [xPad logBottom contentW logH]);
+        sharedBottom = actionY + rowH + 14;
+        sharedTop = fsRowY - 64;
+        sharedH = max(160, sharedTop - sharedBottom);
+        set(grpFreq, 'Position', [xPad sharedBottom contentW sharedH]);
+        set(grpLog, 'Position', [xPad sharedBottom contentW sharedH]);
+
+        freqH = sharedH;
+        set(lblFreqPlotMode, 'Position', [12 freqH - 44 60 16]);
+        set(ddFreqPlotMode, 'Position', [76 freqH - 46 contentW - 86 21]);
+        set(lblFreqChannels, 'Position', [12 freqH - 74 55 16]);
+        set(lstFreqPairs, 'Position', [12 12 contentW - 20 freqH - 88]);
+
+        logH = sharedH;
 
         presetY = logH - 44;
         plotModeY = presetY - 28;
@@ -590,18 +616,27 @@ set(fig, 'ResizeFcn', @onResize);
         topMargin = 82;
         bottomMargin = 56;
         midGap = 72;
-        usableH = th - topMargin - bottomMargin - midGap;
-        axH = max(250, floor(usableH / 2));
         axW = tw - 60;
-        phaseY = bottomMargin;
-        magY = phaseY + axH + midGap;
-        set(axMag, 'Position', [24 magY axW axH]);
-        set(axPhase, 'Position', [24 phaseY axW axH]);
-        set(btnPhaseFigure, 'Position', [tw - rightInset phaseY + axH + 16 figBtnW 26]);
+        freqAreaY = bottomMargin;
+        freqAreaH = th - topMargin - bottomMargin;
+        if strcmp(getPopupSelectedString(ddFreqPlotMode), 'Subplots')
+            set(pnlMagArea, 'Position', [24 freqAreaY axW freqAreaH], 'Visible', 'on');
+            set(pnlPhaseArea, 'Position', [24 0 1 1], 'Visible', 'off');
+            set(btnPhaseFigure, 'Position', [tw - rightInset figBtnY figBtnW 26], 'Enable', 'on');
+        else
+            usableH = freqAreaH - midGap;
+            axH = max(250, floor(usableH / 2));
+            phaseY = bottomMargin;
+            magY = phaseY + axH + midGap;
+            set(pnlMagArea, 'Position', [24 magY axW axH], 'Visible', 'on');
+            set(pnlPhaseArea, 'Position', [24 phaseY axW axH], 'Visible', 'on');
+            set(btnPhaseFigure, 'Position', [tw - rightInset phaseY + axH + 16 figBtnW 26], 'Enable', 'on');
+        end
         set(lblLogSelected, 'Position', [24 topLabelY tw - 190 18]);
         set(lblLogContext, 'Position', [24 topLabelY - 18 tw - 190 16]);
         set(btnLogFigure, 'Position', [tw - rightInset figBtnY figBtnW 26]);
         set(pnlLogArea, 'Position', [20 45 axW th - 132]);
+        layoutFrequencyAxes();
         layoutLogAxes();
     end
 
@@ -614,79 +649,76 @@ set(fig, 'ResizeFcn', @onResize);
             return;
         end
 
-        pairLabel = getPopupSelectedString(ddPair);
-        if isempty(pairLabel) || strcmp(pairLabel, '(none)')
-            setStatus('Status: no available channel pair for the selected frequency files.');
+        pairLabels = getSelectedFrequencyPairLabels(app.files, freqIdx, lstFreqPairs);
+        if isempty(pairLabels)
+            pairLabels = collectFrequencyPairLabels(app.files, freqIdx);
+        end
+        if isempty(pairLabels)
+            setStatus('Status: no available channel pairs for the selected frequency files.');
             return;
         end
 
-        if ~app.holdPlots
-            clearAxisAndLegend(axMag);
-            clearAxisAndLegend(axPhase);
-        end
-
-        hold(axMag, 'on');
-        hold(axPhase, 'on');
-        plotted = 0;
-        skipped = {};
-        xMin = inf;
-        xMax = -inf;
-
-        for i = 1:numel(freqIdx)
-            F = app.files{freqIdx(i)};
-            pairIdx = findPairIndexByLabel(F, pairLabel);
-            if pairIdx < 1
-                skipped{end + 1} = F.displayName; %#ok<AGROW>
-                continue;
-            end
-            try
-                [freq, magDb, phaseDeg] = computeTransferPair(F, pairIdx);
-                if isempty(freq)
-                    skipped{end + 1} = F.displayName; %#ok<AGROW>
-                    continue;
-                end
-                legendName = sprintf('%s | Fs=%g/%g', F.displayName, F.fsNumerator, F.update);
-                semilogx(axMag, freq, magDb, 'LineWidth', 1.1, 'DisplayName', legendName);
-                semilogx(axPhase, freq, phaseDeg, 'LineWidth', 1.1, 'DisplayName', legendName);
-                xMin = min(xMin, min(freq));
-                xMax = max(xMax, max(freq));
-                plotted = plotted + 1;
-            catch ME
-                skipped{end + 1} = sprintf('%s (%s)', F.displayName, ME.message); %#ok<AGROW>
-            end
-        end
-
-        hold(axMag, 'off');
-        hold(axPhase, 'off');
-        grid(axMag, 'on');
-        grid(axPhase, 'on');
-        xlabel(axMag, 'Frequency (Hz)');
-        xlabel(axPhase, 'Frequency (Hz)');
-        ylabel(axMag, 'Magnitude (dB)');
-        ylabel(axPhase, 'Phase (deg)');
-        title(axMag, sprintf('Magnitude (dB) - %s', pairLabel));
-        title(axPhase, sprintf('Phase (deg) - %s', pairLabel));
-        if plotted > 0 && isfinite(xMin) && isfinite(xMax) && xMax > xMin
-            xlim(axMag, [xMin xMax]);
-            xlim(axPhase, [xMin xMax]);
+        [freqRender, plotted, skipped] = collectFrequencyRenderData(app.files, freqIdx, pairLabels);
+        if strcmp(app.freqPlotMode, 'Subplots')
+            renderFrequencySubplots(freqRender);
         else
-            set(axMag, 'XLimMode', 'auto');
-            set(axPhase, 'XLimMode', 'auto');
+            renderFrequencyOverlay(freqRender);
         end
-
-        if plotted > 0
-            legend(axMag, 'show', 'Location', 'northeast');
-            legend(axPhase, 'show', 'Location', 'northeast');
-        else
-            legend(axMag, 'off');
-            legend(axPhase, 'off');
-        end
+        app = getApp();
+        app.lastFreqRender = struct( ...
+            'mode', app.freqPlotMode, ...
+            'fileIds', cellfun(@(F) F.id, app.files(freqIdx)), ...
+            'pairLabels', {pairLabels}, ...
+            'layout', chooseTightGrid(numel(pairLabels)), ...
+            'summary', summarizeFrequencySelection(pairLabels, numel(freqIdx)));
+        setApp(app);
 
         if isempty(skipped)
-            setStatus(sprintf('Status: plotted pair %s for %d frequency file(s).', pairLabel, plotted));
+            setStatus(sprintf('Status: plotted %d frequency curve set(s) for %d channel(s).', plotted, numel(pairLabels)));
         else
-            setStatus(sprintf('Status: plotted %d file(s), skipped %d. See selection for details.', plotted, numel(skipped)));
+            setStatus(sprintf('Status: plotted %d frequency curve set(s), skipped %d.', plotted, numel(skipped)));
         end
+    end
+
+    function renderFrequencyOverlay(freqRender)
+        app = getApp();
+        hasOverlayView = isstruct(app.lastFreqRender) && isfield(app.lastFreqRender, 'mode') && strcmp(app.lastFreqRender.mode, 'Overlay');
+        if ~app.holdPlots || isempty(axMag) || ~ishghandle(axMag) || ~hasOverlayView
+            clearFrequencyRenderArea(false);
+            axMag = createFrequencyHostAxis(pnlMagArea, 'Magnitude (dB)', 'Magnitude (dB)');
+            axPhase = createFrequencyHostAxis(pnlPhaseArea, 'Phase (deg)', 'Phase (deg)');
+        end
+        hold(axMag, 'on');
+        hold(axPhase, 'on');
+        xMin = inf;
+        xMax = -inf;
+        for i = 1:numel(freqRender)
+            for j = 1:numel(freqRender(i).curves)
+                C = freqRender(i).curves(j);
+                semilogx(axMag, C.freq, C.magDb, 'LineWidth', 1.1, 'DisplayName', C.displayName);
+                semilogx(axPhase, C.freq, C.phaseDeg, 'LineWidth', 1.1, 'DisplayName', C.displayName);
+                xMin = min(xMin, min(C.freq));
+                xMax = max(xMax, max(C.freq));
+            end
+        end
+        hold(axMag, 'off');
+        hold(axPhase, 'off');
+        title(axMag, 'Magnitude (dB)', 'Interpreter', 'none');
+        title(axPhase, 'Phase (deg)', 'Interpreter', 'none');
+        applyFrequencyOverlayAxisStyle(axMag, xMin, xMax, 'Magnitude (dB)');
+        applyFrequencyOverlayAxisStyle(axPhase, xMin, xMax, 'Phase (deg)');
+    end
+
+    function renderFrequencySubplots(freqRender)
+        clearFrequencyRenderArea(false);
+        axMag = [];
+        axPhase = [];
+        if isempty(freqRender)
+            return;
+        end
+        layout = chooseTightGrid(numel(freqRender));
+        renderFrequencyGridToParent(pnlMagArea, freqRender, layout, 'mag');
+        renderFrequencyGridToParent(pnlPhaseArea, freqRender, layout, 'phase');
     end
 
     function plotLogPage()
@@ -805,6 +837,39 @@ set(fig, 'ResizeFcn', @onResize);
         end
     end
 
+    function renderCurrentFrequencyViewInFigure(renderInfo, viewKind)
+        app = getApp();
+        freqIdx = findFilesByIdsAndType(app.files, renderInfo.fileIds, 'freq');
+        if isempty(freqIdx)
+            setStatus('Status: source frequency files are no longer loaded.');
+            return;
+        end
+        freqRender = collectFrequencyRenderData(app.files, freqIdx, renderInfo.pairLabels);
+        hFig = figure('Name', sprintf('Frequency %s - %s', upper(viewKind), renderInfo.summary), ...
+            'NumberTitle', 'off', 'Color', 'w');
+        if strcmp(renderInfo.mode, 'Subplots')
+            renderFrequencyGridToFigure(hFig, freqRender, renderInfo.layout, viewKind);
+        else
+            ax = axes('Parent', hFig, 'Units', 'normalized', ...
+                'Position', [0.10 0.12 0.84 0.78], 'Box', 'on');
+            renderFrequencyOverlayToAxis(ax, freqRender, viewKind);
+        end
+    end
+
+    function clearFrequencyRenderArea(showPlaceholder)
+        if nargin < 1
+            showPlaceholder = false;
+        end
+        delete(findall(pnlMagArea, 'Type', 'axes'));
+        delete(findall(pnlPhaseArea, 'Type', 'axes'));
+        axMag = [];
+        axPhase = [];
+        if showPlaceholder
+            axMag = createFrequencyHostAxis(pnlMagArea, 'Magnitude (dB)', 'Magnitude (dB)');
+            axPhase = createFrequencyHostAxis(pnlPhaseArea, 'Phase (deg)', 'Phase (deg)');
+        end
+    end
+
     function clearLogRenderArea(showPlaceholder)
         if nargin < 1
             showPlaceholder = false;
@@ -817,6 +882,12 @@ set(fig, 'ResizeFcn', @onResize);
         if showPlaceholder
             axLog = createLogHostAxis(pnlLogArea, 'Log / Sensor Time Series');
         end
+    end
+
+    function layoutFrequencyAxes()
+        app = getApp();
+        layoutFrequencyAreaAxes(pnlMagArea, app.lastFreqRender);
+        layoutFrequencyAreaAxes(pnlPhaseArea, app.lastFreqRender);
     end
 
     function layoutLogAxes()
@@ -893,11 +964,13 @@ set(fig, 'ResizeFcn', @onResize);
         end
 
         refreshFrequencyPairItems();
+        refreshFrequencyPairSelection([]);
         refreshLogPresetItems();
         refreshLogChannelSelection([]);
         updateLogRangeControls();
         updateTabControlVisibility();
         updateTabSummaries();
+        setPopupItemsCompat(ddFreqPlotMode, {'Overlay', 'Subplots'}, app.freqPlotMode);
         setPopupItemsCompat(ddPlotMode, {'Subplots', 'Overlay'}, app.logPlotMode);
         updateHoldControlState();
         updateDemeanControlState();
@@ -910,12 +983,31 @@ set(fig, 'ResizeFcn', @onResize);
         if isempty(freqIdx)
             freqIdx = findFilesByType(app.files, 'freq');
         end
-        prev = getPopupSelectedString(ddPair);
         items = collectFrequencyPairLabels(app.files, freqIdx);
         if isempty(items)
             items = {'(none)'};
         end
-        setPopupItemsCompat(ddPair, items, prev);
+        set(lstFreqPairs, 'String', items);
+    end
+
+    function refreshFrequencyPairSelection(preferredNames)
+        if nargin < 1
+            preferredNames = [];
+        end
+        items = getListboxItems(lstFreqPairs);
+        if isempty(items) || (numel(items) == 1 && strcmp(items{1}, '(none)'))
+            set(lstFreqPairs, 'Value', 1);
+            return;
+        end
+        if isempty(preferredNames)
+            value = 1:numel(items);
+        else
+            value = mapNamesToIndices(items, preferredNames);
+            if isempty(value)
+                value = 1:numel(items);
+            end
+        end
+        set(lstFreqPairs, 'Value', value);
     end
 
     function refreshLogPresetItems()
@@ -926,9 +1018,6 @@ set(fig, 'ResizeFcn', @onResize);
             setPopupItemsCompat(ddPreset, {'(none)'}, '(none)');
             set(lblLogSelected, 'String', 'Active log file: (none)');
             set(lblLogContext, 'String', 'Category / preset / mode');
-            if isempty(note)
-                set(lblFreqInfo, 'String', 'Select one or more frequency files to overlay.');
-            end
             return;
         end
 
@@ -1007,10 +1096,14 @@ set(fig, 'ResizeFcn', @onResize);
         selIds = getSelectedFileIds();
         freqIdx = findFilesByIdsAndType(app.files, selIds, 'freq');
         if isempty(freqIdx)
-            set(lblFreqSelected, 'String', 'Selected pair overlay: (no frequency files selected)');
+            set(lblFreqSelected, 'String', 'Selected frequency channels: (no frequency files selected)');
         else
-            pairLabel = getPopupSelectedString(ddPair);
-            set(lblFreqSelected, 'String', sprintf('Selected pair overlay: %s | files: %d', pairLabel, numel(freqIdx)));
+            pairLabels = getSelectedFrequencyPairLabels(app.files, freqIdx, lstFreqPairs);
+            if isempty(pairLabels)
+                pairLabels = collectFrequencyPairLabels(app.files, freqIdx);
+            end
+            set(lblFreqSelected, 'String', sprintf('Selected frequency channels: %s | mode: %s | files: %d', ...
+                summarizeFrequencySelection(pairLabels), app.freqPlotMode, numel(freqIdx)));
         end
 
         [F, note] = getCurrentLogFile(app.files, selIds);
@@ -1031,7 +1124,9 @@ set(fig, 'ResizeFcn', @onResize);
 
     function updateHoldControlState()
         app = getApp();
-        if strcmp(app.activeTab, 'log') && strcmp(getPopupSelectedString(ddPlotMode), 'Subplots')
+        isFreqSubplots = strcmp(app.activeTab, 'freq') && strcmp(getPopupSelectedString(ddFreqPlotMode), 'Subplots');
+        isLogSubplots = strcmp(app.activeTab, 'log') && strcmp(getPopupSelectedString(ddPlotMode), 'Subplots');
+        if isFreqSubplots || isLogSubplots
             app.holdPlots = false;
             setApp(app);
             set(btnHold, 'Enable', 'off', 'Value', 0, 'String', 'Hold: Off');
@@ -1223,9 +1318,11 @@ app.nextFileId = 1;
 app.lastOpenDir = pwd;
 app.activeTab = 'freq';
 app.holdPlots = false;
+app.freqPlotMode = 'Overlay';
 app.logPlotMode = 'Subplots';
 app.logDemean = false;
 app.logRangeFileId = 0;
+app.lastFreqRender = [];
 app.lastLogRender = [];
 end
 
@@ -1236,13 +1333,14 @@ if ~ismember(ext, {'.dat', '.txt', '.csv'})
     error('Unsupported file type: %s', ext);
 end
 
-lines = readTextLinesCompat(filePath);
-kind = detectAnalysisFileType(lines, fileName);
+scanLines = readTextLinesCompat(filePath, 256);
+kind = detectAnalysisFileType(scanLines, fileName);
 switch kind
     case 'freq'
+        lines = readTextLinesCompat(filePath);
         F = parseFrequencyAnalysisFile(filePath, lines);
     case 'log'
-        F = parseWideLogAnalysisFile(filePath, lines);
+        F = parseWideLogAnalysisFile(filePath, scanLines);
     otherwise
         error('Unsupported analysis file type.');
 end
@@ -1262,7 +1360,7 @@ for i = 1:maxScan
     if isempty(line)
         continue;
     end
-    if ~isempty(regexpi(line, '^\s*Update\s*:', 'once'))
+    if ~isempty(regexpi(line, '^\s*Update(?:\s+Rate)?\s*:', 'once'))
         hasUpdate = true;
     end
     [~, ok] = parseFixedNumericLine(line, 12);
@@ -1272,7 +1370,7 @@ for i = 1:maxScan
 end
 if hasUpdate && has12NumericLine
     kind = 'freq';
-elseif ~isempty(regexpi(fileName, '^IVHF_', 'once'))
+elseif ~isempty(regexpi(fileName, '^IVH[FS]A?_', 'once'))
     kind = 'freq';
 end
 end
@@ -1290,6 +1388,9 @@ for i = 1:numel(lines)
     end
     if isnan(update)
         v = parseHeaderScalar(line, 'Update');
+        if isnan(v)
+            v = parseHeaderScalar(line, 'Update Rate');
+        end
         if ~isnan(v)
             update = v;
         end
@@ -1374,58 +1475,29 @@ F.fsNumerator = 5000;
 F.fs = F.fsNumerator / F.update;
 end
 
-function F = parseWideLogAnalysisFile(~, lines)
-headerIdx = findFirstNonEmptyLine(lines);
-if headerIdx < 1
-    error('Log file is empty.');
-end
-
-[~, firstNums, firstIsData] = parseWideDataLine(lines{headerIdx}, []);
-if firstIsData
-    dataStart = headerIdx;
-    nNumeric = numel(firstNums);
-    rawHeaderNames = createGenericHeaders(nNumeric);
+function F = parseWideLogAnalysisFile(filePath, lines)
+scan = locateWideLogStructure(lines);
+if ~scan.ok
+    fullLines = readTextLinesCompat(filePath);
+    scan = locateWideLogStructure(fullLines);
 else
-    separatorIdx = findSeparatorLine(lines, headerIdx + 1);
-    if separatorIdx > 0
-        dataStart = separatorIdx + 1;
-    else
-        dataStart = headerIdx + 1;
-    end
-    nNumeric = NaN;
-    firstDataIdx = 0;
-    for i = dataStart:numel(lines)
-        [~, nums, ok] = parseWideDataLine(lines{i}, []);
-        if ok
-            nNumeric = numel(nums);
-            firstDataIdx = i;
-            break;
-        end
-    end
-    if ~isfinite(nNumeric) || nNumeric < 1
-        error('Cannot find numeric log rows.');
-    end
-    if firstDataIdx > dataStart
-        dataStart = firstDataIdx;
-    end
-    headerTokens = tokenizeWhitespace(lines{headerIdx});
-    if numel(headerTokens) >= nNumeric + 2
-        rawHeaderNames = headerTokens(3:(nNumeric + 2));
-    else
-        rawHeaderNames = createGenericHeaders(nNumeric);
-    end
+    fullLines = {};
+end
+if ~scan.ok
+    error('Cannot find numeric log rows.');
 end
 
+nNumeric = scan.nNumeric;
+dataStart = scan.dataStart;
+rawHeaderNames = scan.rawHeaderNames;
 headerNames = normalizeHeaderNames(rawHeaderNames, nNumeric);
 
-timeText = {};
-data = zeros(0, nNumeric);
-for i = dataStart:numel(lines)
-    [txt, nums, ok] = parseWideDataLine(lines{i}, nNumeric);
-    if ok
-        timeText{end + 1, 1} = txt; %#ok<AGROW>
-        data(end + 1, :) = nums; %#ok<AGROW>
+[timeText, data, fastOk] = readWideLogDataBlockFast(filePath, dataStart, nNumeric);
+if ~fastOk
+    if isempty(fullLines)
+        fullLines = readTextLinesCompat(filePath);
     end
+    [timeText, data] = readWideLogDataBlockSlow(fullLines, dataStart, nNumeric);
 end
 if isempty(data)
     error('Log data block is empty.');
@@ -1446,13 +1518,128 @@ F.profile = classifyLegacyLogProfile(size(data, 2));
 F.logCategory = logCategory;
 end
 
-function lines = readTextLinesCompat(filePath)
+function scan = locateWideLogStructure(lines)
+scan = struct('ok', false, 'headerIdx', 0, 'dataStart', 0, 'nNumeric', NaN, 'rawHeaderNames', {{}});
+headerIdx = findFirstNonEmptyLine(lines);
+if headerIdx < 1
+    return;
+end
+
+[~, firstNums, firstIsData] = parseWideDataLine(lines{headerIdx}, []);
+if firstIsData
+    scan.ok = true;
+    scan.headerIdx = headerIdx;
+    scan.dataStart = headerIdx;
+    scan.nNumeric = numel(firstNums);
+    scan.rawHeaderNames = createGenericHeaders(scan.nNumeric);
+    return;
+end
+
+separatorIdx = findSeparatorLine(lines, headerIdx + 1);
+if separatorIdx > 0
+    dataStart = separatorIdx + 1;
+else
+    dataStart = headerIdx + 1;
+end
+
+nNumeric = NaN;
+firstDataIdx = 0;
+for i = dataStart:numel(lines)
+    [~, nums, ok] = parseWideDataLine(lines{i}, []);
+    if ok
+        nNumeric = numel(nums);
+        firstDataIdx = i;
+        break;
+    end
+end
+if ~isfinite(nNumeric) || nNumeric < 1
+    return;
+end
+if firstDataIdx > dataStart
+    dataStart = firstDataIdx;
+end
+
+headerTokens = tokenizeWhitespace(lines{headerIdx});
+if numel(headerTokens) >= nNumeric + 2
+    rawHeaderNames = headerTokens(3:(nNumeric + 2));
+else
+    rawHeaderNames = createGenericHeaders(nNumeric);
+end
+
+scan.ok = true;
+scan.headerIdx = headerIdx;
+scan.dataStart = dataStart;
+scan.nNumeric = nNumeric;
+scan.rawHeaderNames = rawHeaderNames;
+end
+
+function [timeText, data, ok] = readWideLogDataBlockFast(filePath, dataStart, nNumeric)
+timeText = {};
+data = zeros(0, nNumeric);
+ok = false;
+try
+    opts = delimitedTextImportOptions( ...
+        'NumVariables', nNumeric + 2, ...
+        'Delimiter', {' ', sprintf('\t')}, ...
+        'ConsecutiveDelimitersRule', 'join', ...
+        'LeadingDelimitersRule', 'ignore');
+    opts.DataLines = [dataStart Inf];
+    opts.ExtraColumnsRule = 'ignore';
+    opts.EmptyLineRule = 'read';
+    opts.VariableTypes = [repmat({'string'}, 1, 2), repmat({'double'}, 1, nNumeric)];
+    T = readtable(filePath, opts);
+catch
+    return;
+end
+if isempty(T) || size(T, 2) < nNumeric + 2
+    return;
+end
+
+raw = T{:, 3:(nNumeric + 2)};
+if isempty(raw)
+    return;
+end
+data = double(raw);
+if isempty(data) || size(data, 2) ~= nNumeric
+    return;
+end
+dateCol = string(T{:, 1});
+timeCol = string(T{:, 2});
+valid = all(isfinite(data), 2);
+if ~any(valid)
+    data = zeros(0, nNumeric);
+    timeText = {};
+    return;
+end
+data = data(valid, :);
+dateCol = dateCol(valid);
+timeCol = timeCol(valid);
+timeText = cellstr(dateCol + " " + timeCol);
+ok = true;
+end
+
+function [timeText, data] = readWideLogDataBlockSlow(lines, dataStart, nNumeric)
+timeText = {};
+data = zeros(0, nNumeric);
+for i = dataStart:numel(lines)
+    [txt, nums, ok] = parseWideDataLine(lines{i}, nNumeric);
+    if ok
+        timeText{end + 1, 1} = txt; %#ok<AGROW>
+        data(end + 1, :) = nums; %#ok<AGROW>
+    end
+end
+end
+
+function lines = readTextLinesCompat(filePath, maxLines)
+if nargin < 2
+    maxLines = inf;
+end
 fid = fopen(filePath, 'r');
 if fid < 0
     error('Cannot open file: %s', filePath);
 end
 cleanup = onCleanup(@() fclose(fid));
-C = textscan(fid, '%s', 'Delimiter', '\n', 'Whitespace', '');
+C = textscan(fid, '%s', maxLines, 'Delimiter', '\n', 'Whitespace', '');
 lines = C{1};
 if isempty(lines)
     lines = {};
@@ -1568,6 +1755,8 @@ function base = normalizePairName(nameIn)
 base = strtrim(nameIn);
 base = regexprep(base, '\[[^\]]*\]', '');
 base = regexprep(base, '\([^\)]*\)', '');
+base = regexprep(base, '[_-]?(noise|geo|geophone|sensor|resp|response|input|output)$', '', 'ignorecase');
+base = regexprep(base, '[_-]?(noise|geo|geophone|sensor|resp|response|input|output)[_-].*$', '', 'ignorecase');
 base = regexprep(base, '[_-]?(in|out)$', '', 'ignorecase');
 base = regexprep(base, '[_-]?(in|out)[_-].*$', '', 'ignorecase');
 base = regexprep(base, '\s+', '');
@@ -1656,8 +1845,8 @@ function groups = buildWideLogGroups(headerNames)
 groups = struct('name', {}, 'columnIdx', {}, 'displayNames', {}, 'layout', {});
 nCols = numel(headerNames);
 
-groups = addHeaderMatchGroup(groups, 'BF Velocity', headerNames, '^VEL_BF_');
-groups = addHeaderMatchGroup(groups, 'SF Velocity', headerNames, '^VEL_SF_');
+groups = addHeaderMatchGroup(groups, 'BF Velocity', headerNames, '^(VEL_BF_|ACC_BF_)');
+groups = addHeaderMatchGroup(groups, 'SF Velocity', headerNames, '^(VEL_SF_|ACC_SF_)');
 groups = addHeaderMatchGroup(groups, 'PROX Position', headerNames, '^PROX_');
 groups = addHeaderMatchGroup(groups, 'PS Motion', headerNames, '^PS_(POS|ACC)_');
 groups = addGroupedValueOutputs(groups, headerNames);
@@ -1679,6 +1868,7 @@ elseif nCols == 55
     groups = appendLegacy55Groups(groups);
 end
 
+groups = appendAutoPrefixGroups(groups, headerNames);
 groups = appendGroup(groups, 'All Channels', 1:nCols, headerNames, chooseTightGrid(nCols));
 end
 
@@ -1691,7 +1881,7 @@ for i = 1:numel(headerNames)
     if ~isempty(regexpi(name, '^(INP|OUT|TEMP_)', 'once'))
         inpScore = inpScore + 1;
     end
-    if ~isempty(regexpi(name, '^(VEL_BF_|VEL_SF_|PROX_|VALUE\d+_|MT_)', 'once'))
+    if ~isempty(regexpi(name, '^(VEL_BF_|ACC_BF_|VEL_SF_|ACC_SF_|PROX_|VALUE\d+_|VALVE\d+_|MT_)', 'once'))
         s611aScore = s611aScore + 1;
     end
     if ~isempty(regexpi(name, '^(PS_|VS_|VFS_|TS_|WS\d*_?|RS_|AC_|RESERVED)', 'once'))
@@ -1769,11 +1959,275 @@ end
 
 function layout = chooseRenderLayout(G, nPlots)
 layout = [];
+usePresetLayout = false;
 if isfield(G, 'layout') && numel(G.layout) == 2 && prod(G.layout) >= nPlots
+    if isfield(G, 'columnIdx') && nPlots == numel(G.columnIdx)
+        usePresetLayout = true;
+    elseif ~isfield(G, 'columnIdx')
+        usePresetLayout = true;
+    end
+end
+if usePresetLayout
     layout = G.layout;
 end
 if isempty(layout)
     layout = chooseTightGrid(nPlots);
+end
+end
+
+function ax = createFrequencyHostAxis(parentObj, ttl, ylbl)
+ax = axes('Parent', parentObj, 'Units', 'normalized', ...
+    'Position', [0.08 0.12 0.88 0.80], 'Box', 'on');
+title(ax, ttl, 'Interpreter', 'none');
+xlabel(ax, 'Frequency (Hz)');
+ylabel(ax, ylbl);
+set(ax, 'XScale', 'log');
+grid(ax, 'on');
+end
+
+function layoutFrequencyAreaAxes(parentObj, renderInfo)
+kids = findall(parentObj, 'Type', 'axes');
+if isempty(kids)
+    return;
+end
+if ~isempty(renderInfo) && isstruct(renderInfo) && isfield(renderInfo, 'mode') ...
+        && strcmp(renderInfo.mode, 'Subplots') && numel(kids) > 1
+    layout = renderInfo.layout;
+    if prod(layout) < numel(kids)
+        layout = chooseTightGrid(numel(kids));
+    end
+    applyAxesGridLayout(flipud(kids), layout);
+else
+    set(kids, 'Units', 'normalized');
+    if isscalar(kids)
+        set(kids, 'Position', [0.08 0.12 0.88 0.80]);
+    end
+end
+end
+
+function [freqRender, plotted, skipped] = collectFrequencyRenderData(files, freqIdx, pairLabels)
+freqRender = struct('pairLabel', {}, 'curves', {});
+plotted = 0;
+skipped = {};
+for p = 1:numel(pairLabels)
+    curves = struct('freq', {}, 'magDb', {}, 'phaseDeg', {}, 'displayName', {});
+    for i = 1:numel(freqIdx)
+        F = files{freqIdx(i)};
+        pairIdx = findPairIndexByLabel(F, pairLabels{p});
+        if pairIdx < 1
+            skipped{end + 1} = sprintf('%s | %s', pairLabels{p}, F.displayName); %#ok<AGROW>
+            continue;
+        end
+        try
+            [freq, magDb, phaseDeg] = computeTransferPair(F, pairIdx);
+        catch ME
+            skipped{end + 1} = sprintf('%s | %s (%s)', pairLabels{p}, F.displayName, ME.message); %#ok<AGROW>
+            continue;
+        end
+        if isempty(freq)
+            skipped{end + 1} = sprintf('%s | %s', pairLabels{p}, F.displayName); %#ok<AGROW>
+            continue;
+        end
+        C = struct();
+        C.freq = freq;
+        C.magDb = magDb;
+        C.phaseDeg = phaseDeg;
+        C.displayName = pairLabels{p};
+        curves(end + 1) = C; %#ok<AGROW>
+        plotted = plotted + 1;
+    end
+    if ~isempty(curves)
+        freqRender(end + 1).pairLabel = pairLabels{p}; %#ok<AGROW>
+        freqRender(end).curves = curves;
+    end
+end
+end
+
+function renderFrequencyGridToParent(parentObj, freqRender, layout, viewKind)
+axesHandles = createAxesGrid(parentObj, layout, numel(freqRender));
+for i = 1:numel(axesHandles)
+    renderFrequencyPairToAxis(axesHandles(i), freqRender(i), viewKind);
+    styleFrequencySubplotAxis(axesHandles(i), i, layout, false, viewKind);
+end
+end
+
+function renderFrequencyGridToFigure(hFig, freqRender, layout, viewKind)
+axesHandles = createAxesGrid(hFig, layout, numel(freqRender));
+for i = 1:numel(axesHandles)
+    renderFrequencyPairToAxis(axesHandles(i), freqRender(i), viewKind);
+    styleFrequencySubplotAxis(axesHandles(i), i, layout, true, viewKind);
+end
+ttl = ternaryText(strcmp(viewKind, 'mag'), 'Frequency Magnitude', 'Frequency Phase');
+try
+    sgtitle(hFig, ttl, 'Interpreter', 'none');
+catch
+end
+end
+
+function renderFrequencyPairToAxis(ax, pairInfo, viewKind)
+cla(ax);
+hold(ax, 'on');
+xMin = inf;
+xMax = -inf;
+for j = 1:numel(pairInfo.curves)
+    C = pairInfo.curves(j);
+    if strcmp(viewKind, 'mag')
+        semilogx(ax, C.freq, C.magDb, 'LineWidth', 1.1, 'DisplayName', C.displayName);
+    else
+        semilogx(ax, C.freq, C.phaseDeg, 'LineWidth', 1.1, 'DisplayName', C.displayName);
+    end
+    xMin = min(xMin, min(C.freq));
+    xMax = max(xMax, max(C.freq));
+end
+hold(ax, 'off');
+grid(ax, 'on');
+set(ax, 'XScale', 'log');
+applyFrequencyXLimits(ax, xMin, xMax);
+    if strcmp(viewKind, 'mag')
+        title(ax, pairInfo.pairLabel, 'Interpreter', 'none');
+        ylabel(ax, 'Magnitude (dB)');
+    else
+        title(ax, pairInfo.pairLabel, 'Interpreter', 'none');
+        ylabel(ax, 'Phase (deg)');
+    end
+    if numel(pairInfo.curves) > 1 && numel(unique(getCurveDisplayNames(pairInfo.curves))) > 1
+        legend(ax, 'show', 'Location', 'northeast');
+    else
+        legend(ax, 'off');
+    end
+end
+
+function renderFrequencyOverlayToAxis(ax, freqRender, viewKind)
+cla(ax);
+hold(ax, 'on');
+xMin = inf;
+xMax = -inf;
+for i = 1:numel(freqRender)
+    for j = 1:numel(freqRender(i).curves)
+        C = freqRender(i).curves(j);
+        if strcmp(viewKind, 'mag')
+            semilogx(ax, C.freq, C.magDb, 'LineWidth', 1.1, 'DisplayName', C.displayName);
+        else
+            semilogx(ax, C.freq, C.phaseDeg, 'LineWidth', 1.1, 'DisplayName', C.displayName);
+        end
+        xMin = min(xMin, min(C.freq));
+        xMax = max(xMax, max(C.freq));
+    end
+end
+    hold(ax, 'off');
+    grid(ax, 'on');
+    set(ax, 'XScale', 'log');
+    applyFrequencyXLimits(ax, xMin, xMax);
+    if strcmp(viewKind, 'mag')
+        title(ax, 'Magnitude (dB)', 'Interpreter', 'none');
+        ylabel(ax, 'Magnitude (dB)');
+    else
+        title(ax, 'Phase (deg)', 'Interpreter', 'none');
+        ylabel(ax, 'Phase (deg)');
+    end
+    xlabel(ax, 'Frequency (Hz)');
+if ~isempty(freqRender)
+    legend(ax, 'show', 'Location', 'northeast');
+else
+    legend(ax, 'off');
+end
+end
+
+function applyFrequencyOverlayAxisStyle(ax, xMin, xMax, yLabelText)
+grid(ax, 'on');
+set(ax, 'XScale', 'log');
+xlabel(ax, 'Frequency (Hz)');
+ylabel(ax, yLabelText);
+applyFrequencyXLimits(ax, xMin, xMax);
+legend(ax, 'show', 'Location', 'northeast');
+end
+
+function applyFrequencyXLimits(ax, xMin, xMax)
+if isfinite(xMin) && isfinite(xMax) && xMax > xMin
+    xlim(ax, [xMin xMax]);
+else
+    set(ax, 'XLimMode', 'auto');
+end
+end
+
+function styleFrequencySubplotAxis(ax, idx, layout, isExportFigure, viewKind)
+nRows = layout(1);
+nCols = layout(2);
+row = ceil(idx / nCols);
+col = mod(idx - 1, nCols) + 1;
+if row == nRows
+    xlabel(ax, 'Frequency (Hz)');
+else
+    xlabel(ax, '');
+end
+if col == 1
+    if strcmp(viewKind, 'mag')
+        ylabel(ax, 'Magnitude (dB)');
+    else
+        ylabel(ax, 'Phase (deg)');
+    end
+else
+    ylabel(ax, '');
+end
+if isExportFigure
+    set(ax, 'FontSize', 10, 'TitleFontSizeMultiplier', 0.95);
+else
+    set(ax, 'FontSize', 9, 'TitleFontSizeMultiplier', 0.90);
+end
+end
+
+function pairLabels = getSelectedFrequencyPairLabels(files, freqIdx, hList)
+items = getListboxItems(hList);
+if isempty(items) || (numel(items) == 1 && strcmp(items{1}, '(none)'))
+    pairLabels = {};
+    return;
+end
+sel = getListSelectionIndices(hList, numel(items));
+if isempty(sel)
+    pairLabels = collectFrequencyPairLabels(files, freqIdx);
+else
+    pairLabels = items(sel);
+end
+end
+
+function txt = summarizeFrequencySelection(pairLabels, nFiles)
+if isempty(pairLabels)
+    txt = '(none)';
+elseif numel(pairLabels) == 1
+    txt = pairLabels{1};
+elseif numel(pairLabels) == 2
+    txt = sprintf('%s, %s', pairLabels{1}, pairLabels{2});
+else
+    txt = sprintf('%s and %d more', pairLabels{1}, numel(pairLabels) - 1);
+end
+if nargin >= 2 && nFiles > 0
+    txt = sprintf('%s | files: %d', txt, nFiles);
+end
+end
+
+function txt = summarizeFrequencyPairNames(freqRender)
+pairLabels = cell(1, numel(freqRender));
+for i = 1:numel(freqRender)
+    pairLabels{i} = freqRender(i).pairLabel;
+end
+txt = summarizeFrequencySelection(pairLabels);
+end
+
+function names = getCurveDisplayNames(curves)
+names = cell(1, numel(curves));
+for i = 1:numel(curves)
+    names{i} = curves(i).displayName;
+end
+end
+
+function items = getListboxItems(h)
+raw = get(h, 'String');
+if isempty(raw)
+    items = {};
+elseif ischar(raw)
+    items = {raw};
+else
+    items = raw(:).';
 end
 end
 
@@ -1949,13 +2403,21 @@ end
 end
 
 function groups = addGroupedValueOutputs(groups, headerNames)
-valuePrefixes = {'VALUE1_', 'VALUE2_', 'VALUE3_', 'VALUE4_'};
+valuePrefixes = { ...
+    {'VALUE1_', 'VALVE1_'}, ...
+    {'VALUE2_', 'VALVE2_'}, ...
+    {'VALUE3_', 'VALVE3_'}, ...
+    {'VALUE4_', 'VALVE4_'}};
 for i = 1:numel(valuePrefixes)
-    prefix = valuePrefixes{i};
+    prefixSet = valuePrefixes{i};
+    exprParts = cell(1, numel(prefixSet));
+    for j = 1:numel(prefixSet)
+        exprParts{j} = ['^', regexptranslate('escape', prefixSet{j})];
+    end
     name = ['Valve Output ', num2str(i)];
-    groups = addHeaderMatchGroup(groups, name, headerNames, ['^', regexptranslate('escape', prefix)]);
+    groups = addHeaderMatchGroup(groups, name, headerNames, strjoin(exprParts, '|'));
 end
-groups = addHeaderMatchGroup(groups, 'Valve Output All', headerNames, '^VALUE\d+_');
+groups = addHeaderMatchGroup(groups, 'Valve Output All', headerNames, '^(VALUE\d+_|VALVE\d+_)');
 end
 
 function groups = addInputOutputSensorGroups(groups, headerNames)
@@ -2037,6 +2499,62 @@ for i = 1:numel(groups)
     end
 end
 groups = appendGroup(groups, groupName, idx, names, layout);
+end
+
+function groups = appendAutoPrefixGroups(groups, headerNames)
+prefixMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
+for i = 1:numel(headerNames)
+    prefix = deriveAutoGroupPrefix(headerNames{i});
+    if isempty(prefix)
+        continue;
+    end
+    if isKey(prefixMap, prefix)
+        item = prefixMap(prefix);
+        item.idx(end + 1) = i; %#ok<AGROW>
+        item.names{end + 1} = headerNames{i}; %#ok<AGROW>
+        prefixMap(prefix) = item;
+    else
+        prefixMap(prefix) = struct('idx', i, 'names', {{headerNames{i}}});
+    end
+end
+keysList = keys(prefixMap);
+for i = 1:numel(keysList)
+    prefix = keysList{i};
+    item = prefixMap(prefix);
+    if numel(item.idx) < 2
+        continue;
+    end
+    groupName = ['Auto ', prefix];
+    groups = appendGroupIfMissing(groups, groupName, item.idx, item.names, chooseTightGrid(numel(item.idx)));
+end
+end
+
+function prefix = deriveAutoGroupPrefix(headerName)
+prefix = upper(strtrim(headerName));
+prefix = regexprep(prefix, '\(.*$', '');
+prefix = regexprep(prefix, '\s+', '');
+if isempty(prefix)
+    prefix = '';
+    return;
+end
+parts = regexp(prefix, '[_-]', 'split');
+if numel(parts) >= 2
+    prefix = [parts{1}, '_', parts{2}];
+elseif ~isempty(regexp(prefix, '^[A-Z]+\d+', 'once'))
+    tok = regexp(prefix, '^([A-Z]+)\d+', 'tokens', 'once');
+    prefix = tok{1};
+else
+    tok = regexp(prefix, '^([A-Z]+)', 'tokens', 'once');
+    if isempty(tok)
+        prefix = '';
+    else
+        prefix = tok{1};
+    end
+end
+prefix = strtrim(prefix);
+if isempty(prefix) || numel(prefix) < 2 || strcmp(prefix, 'AUTO')
+    prefix = '';
+end
 end
 
 function layout = chooseTightGrid(n)
@@ -2257,46 +2775,6 @@ end
 function clearAxisAndLegend(ax)
 cla(ax);
 legend(ax, 'off');
-end
-
-function cloneAxisToFigure(sourceAx, fallbackTitle)
-hFig = figure('Name', fallbackTitle, 'NumberTitle', 'off', 'Color', 'w');
-newAx = axes('Parent', hFig, 'Units', 'normalized', ...
-    'Position', [0.13 0.11 0.775 0.815], 'Box', 'on');
-copyAxisState(sourceAx, newAx);
-end
-
-function copyAxisState(sourceAx, targetAx)
-cla(targetAx);
-srcChildren = flipud(get(sourceAx, 'Children'));
-for i = 1:numel(srcChildren)
-    copyobj(srcChildren(i), targetAx);
-end
-set(targetAx, 'XScale', get(sourceAx, 'XScale'));
-set(targetAx, 'YScale', get(sourceAx, 'YScale'));
-set(targetAx, 'XLimMode', get(sourceAx, 'XLimMode'));
-set(targetAx, 'YLimMode', get(sourceAx, 'YLimMode'));
-if strcmp(get(sourceAx, 'XLimMode'), 'manual')
-    set(targetAx, 'XLim', get(sourceAx, 'XLim'));
-end
-if strcmp(get(sourceAx, 'YLimMode'), 'manual')
-    set(targetAx, 'YLim', get(sourceAx, 'YLim'));
-end
-grid(targetAx, get(sourceAx, 'XGrid'));
-title(targetAx, getTitleStringCompat(get(get(sourceAx, 'Title'), 'String')), 'Interpreter', 'none');
-xlabel(targetAx, getTitleStringCompat(get(get(sourceAx, 'XLabel'), 'String')), 'Interpreter', 'none');
-ylabel(targetAx, getTitleStringCompat(get(get(sourceAx, 'YLabel'), 'String')), 'Interpreter', 'none');
-legend(targetAx, 'show', 'Location', 'northeast');
-end
-
-function txt = getTitleStringCompat(raw)
-if iscell(raw)
-    txt = strjoin(raw, ' ');
-elseif ischar(raw)
-    txt = raw;
-else
-    txt = '';
-end
 end
 
 function showAlertCompat(figHandle, msg, ttl)

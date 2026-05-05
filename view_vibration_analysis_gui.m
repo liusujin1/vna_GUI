@@ -97,17 +97,29 @@ ddFreqPlotMode = uicontrol('Parent', grpFreq, 'Style', 'popupmenu', ...
     'BackgroundColor', 'w', ...
     'Position', [76 110 234 24], ...
     'Callback', @onFreqPlotModeChanged);
+lblFreqXAxis = uicontrol('Parent', grpFreq, 'Style', 'text', ...
+    'String', 'X Axis:', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [12 84 50 20], ...
+    'Visible', 'off');
+ddFreqXAxis = uicontrol('Parent', grpFreq, 'Style', 'popupmenu', ...
+    'String', {'Sample Index', 'Time (s)'}, ...
+    'Value', 1, ...
+    'BackgroundColor', 'w', ...
+    'Position', [76 82 234 24], ...
+    'Visible', 'off', ...
+    'Callback', @onFreqXAxisChanged);
 lblFreqChannels = uicontrol('Parent', grpFreq, 'Style', 'text', ...
     'String', 'Channels:', ...
     'HorizontalAlignment', 'left', ...
-    'Position', [12 84 55 20]);
+    'Position', [12 56 55 20]);
 lstFreqPairs = uicontrol('Parent', grpFreq, 'Style', 'listbox', ...
     'String', {'(none)'}, ...
     'Value', 1, ...
     'Min', 0, ...
     'Max', 2, ...
     'BackgroundColor', 'w', ...
-    'Position', [12 12 298 70], ...
+    'Position', [12 12 298 42], ...
     'Callback', @onFreqChannelsChanged);
 lblFreqInfo = uicontrol('Parent', grpFreq, 'Style', 'text', ...
     'String', '', ...
@@ -193,7 +205,7 @@ lblStatus = uicontrol('Parent', panel, 'Style', 'text', ...
     'Position', [15 18 330 78]);
 
 tabGroup = uitabgroup('Parent', fig, 'Units', 'pixels', 'Position', [390 15 1055 830]);
-tabFreq = uitab('Parent', tabGroup, 'Title', 'Frequency Response');
+tabFreq = uitab('Parent', tabGroup, 'Title', 'IVSR Analysis');
 tabLog = uitab('Parent', tabGroup, 'Title', 'Log / Sensors');
 try
     set(tabGroup, 'SelectionChangedFcn', @onTabChanged);
@@ -345,8 +357,7 @@ set(fig, 'ResizeFcn', @onResize);
 
     function onApplyFsNumerator(~, ~)
         app = getApp();
-        selIds = getSelectedFileIds();
-        freqIdx = findFilesByIdsAndType(app.files, selIds, 'freq');
+        [~, freqIdx] = getCurrentFrequencySelection(app.files, getSelectedFileIds());
         if isempty(freqIdx)
             setStatus('Status: select frequency files before applying Fs numerator.');
             return;
@@ -398,6 +409,13 @@ set(fig, 'ResizeFcn', @onResize);
     end
 
     function onFreqChannelsChanged(~, ~)
+        autoPlotCurrentSelection();
+    end
+
+    function onFreqXAxisChanged(~, ~)
+        app = getApp();
+        app.freqXAxisMode = getPopupSelectedString(ddFreqXAxis);
+        setApp(app);
         autoPlotCurrentSelection();
     end
 
@@ -581,8 +599,10 @@ set(fig, 'ResizeFcn', @onResize);
         freqH = sharedH;
         set(lblFreqPlotMode, 'Position', [12 freqH - 44 60 16]);
         set(ddFreqPlotMode, 'Position', [76 freqH - 46 contentW - 86 21]);
-        set(lblFreqChannels, 'Position', [12 freqH - 74 55 16]);
-        set(lstFreqPairs, 'Position', [12 12 contentW - 20 freqH - 88]);
+        set(lblFreqXAxis, 'Position', [12 freqH - 72 50 16]);
+        set(ddFreqXAxis, 'Position', [76 freqH - 74 contentW - 86 21]);
+        set(lblFreqChannels, 'Position', [12 freqH - 100 55 16]);
+        set(lstFreqPairs, 'Position', [12 12 contentW - 20 max(42, freqH - 114)]);
 
         logH = sharedH;
 
@@ -619,7 +639,12 @@ set(fig, 'ResizeFcn', @onResize);
         axW = tw - 60;
         freqAreaY = bottomMargin;
         freqAreaH = th - topMargin - bottomMargin;
-        if strcmp(getPopupSelectedString(ddFreqPlotMode), 'Subplots')
+        [freqModeName, ~] = getCurrentFrequencySelection(getApp().files, getSelectedFileIds());
+        if strcmp(freqModeName, 'signal')
+            set(pnlMagArea, 'Position', [24 freqAreaY axW freqAreaH], 'Visible', 'on');
+            set(pnlPhaseArea, 'Position', [24 0 1 1], 'Visible', 'off');
+            set(btnPhaseFigure, 'Position', [tw - rightInset figBtnY figBtnW 26], 'Enable', 'off');
+        elseif strcmp(getPopupSelectedString(ddFreqPlotMode), 'Subplots')
             set(pnlMagArea, 'Position', [24 freqAreaY axW freqAreaH], 'Visible', 'on');
             set(pnlPhaseArea, 'Position', [24 0 1 1], 'Visible', 'off');
             set(btnPhaseFigure, 'Position', [tw - rightInset figBtnY figBtnW 26], 'Enable', 'on');
@@ -642,10 +667,14 @@ set(fig, 'ResizeFcn', @onResize);
 
     function plotFrequencyPage()
         app = getApp();
-        selIds = getSelectedFileIds();
-        freqIdx = findFilesByIdsAndType(app.files, selIds, 'freq');
+        [freqMode, freqIdx, freqNote] = getCurrentFrequencySelection(app.files, getSelectedFileIds());
         if isempty(freqIdx)
             setStatus('Status: select one or more frequency files first.');
+            return;
+        end
+        onResize();
+        if strcmp(freqMode, 'signal')
+            renderIvsaSignalPage(freqIdx, freqNote);
             return;
         end
 
@@ -677,6 +706,65 @@ set(fig, 'ResizeFcn', @onResize);
             setStatus(sprintf('Status: plotted %d frequency curve set(s) for %d channel(s).', plotted, numel(pairLabels)));
         else
             setStatus(sprintf('Status: plotted %d frequency curve set(s), skipped %d.', plotted, numel(skipped)));
+        end
+    end
+
+    function renderIvsaSignalPage(freqIdx, freqNote)
+        app = getApp();
+        F = app.files{freqIdx(1)};
+        labels = getSelectedIvsaSignalLabels(app.files, freqIdx, lstFreqPairs);
+        if isempty(labels)
+            labels = collectIvsaSignalSelectionItems(app.files, freqIdx);
+        end
+        if isempty(labels) || (numel(labels) == 1 && strcmp(labels{1}, '(none)'))
+            setStatus('Status: no available signal channels for the selected file.');
+            return;
+        end
+        [xData, Y, names, groupName, xLabelText] = buildIvsaSignalPlotData(F, labels, app.freqXAxisMode);
+        if isempty(Y)
+            setStatus('Status: no plottable signal channels were selected.');
+            return;
+        end
+        if strcmp(app.freqPlotMode, 'Subplots')
+            clearFrequencyRenderArea(false);
+            axMag = [];
+            axPhase = [];
+            layout = chooseTightGrid(size(Y, 2));
+            renderSignalSubplotGridToParent(pnlMagArea, xData, Y, names, layout, groupName, xLabelText);
+        else
+            clearFrequencyRenderArea(false);
+            axMag = createSignalHostAxis(pnlMagArea, F.displayName, xLabelText);
+            axPhase = [];
+            hold(axMag, 'on');
+            for i = 1:size(Y, 2)
+                plot(axMag, xData, Y(:, i), 'LineWidth', 1.0, 'DisplayName', names{i});
+            end
+            hold(axMag, 'off');
+            grid(axMag, 'on');
+            xlabel(axMag, xLabelText);
+            ylabel(axMag, 'Value');
+            applySignalXLimits(axMag, xData);
+            title(axMag, F.displayName, 'Interpreter', 'none');
+            legend(axMag, 'show', 'Location', 'northeast');
+        end
+        app = getApp();
+        app.lastFreqRender = struct( ...
+            'kind', 'signal', ...
+            'mode', app.freqPlotMode, ...
+            'fileIds', F.id, ...
+            'fileName', F.displayName, ...
+            'signalKind', F.signalKind, ...
+            'selectedLabels', {labels}, ...
+            'displayNames', {names}, ...
+            'layout', chooseTightGrid(size(Y, 2)), ...
+            'groupName', groupName, ...
+            'xAxisMode', app.freqXAxisMode, ...
+            'summary', summarizeFrequencySelection(labels, 1));
+        setApp(app);
+        if isempty(freqNote)
+            setStatus(sprintf('Status: plotted %d signal channel(s) from %s in %s mode.', size(Y, 2), F.displayName, lower(app.freqPlotMode)));
+        else
+            setStatus(sprintf('Status: plotted %d signal channel(s) from %s in %s mode (%s).', size(Y, 2), F.displayName, lower(app.freqPlotMode), freqNote));
         end
     end
 
@@ -839,6 +927,34 @@ set(fig, 'ResizeFcn', @onResize);
 
     function renderCurrentFrequencyViewInFigure(renderInfo, viewKind)
         app = getApp();
+        if isfield(renderInfo, 'kind') && strcmp(renderInfo.kind, 'signal')
+            F = getFileById(app.files, renderInfo.fileIds(1));
+            if isempty(F)
+                setStatus('Status: source signal file is no longer loaded.');
+                return;
+            end
+            [xData, Y, names, groupName, xLabelText] = buildIvsaSignalPlotData(F, renderInfo.selectedLabels, renderInfo.xAxisMode);
+            hFig = figure('Name', sprintf('Signal View - %s', renderInfo.fileName), ...
+                'NumberTitle', 'off', 'Color', 'w');
+            if strcmp(renderInfo.mode, 'Subplots')
+                renderSignalSubplotGridToFigure(hFig, xData, Y, names, renderInfo.layout, renderInfo.fileName, groupName, xLabelText);
+            else
+                ax = axes('Parent', hFig, 'Units', 'normalized', ...
+                    'Position', [0.10 0.12 0.84 0.78], 'Box', 'on');
+                for i = 1:size(Y, 2)
+                    plot(ax, xData, Y(:, i), 'LineWidth', 1.0, 'DisplayName', names{i});
+                    hold(ax, 'on');
+                end
+                hold(ax, 'off');
+                grid(ax, 'on');
+                xlabel(ax, xLabelText);
+                ylabel(ax, 'Value');
+                applySignalXLimits(ax, xData);
+                title(ax, renderInfo.fileName, 'Interpreter', 'none');
+                legend(ax, 'show', 'Location', 'northeast');
+            end
+            return;
+        end
         freqIdx = findFilesByIdsAndType(app.files, renderInfo.fileIds, 'freq');
         if isempty(freqIdx)
             setStatus('Status: source frequency files are no longer loaded.');
@@ -945,7 +1061,7 @@ set(fig, 'ResizeFcn', @onResize);
         updateSelectedFileText();
 
         selIds = getSelectedFileIds();
-        freqIdx = findFilesByIdsAndType(app.files, selIds, 'freq');
+        [~, freqIdx] = getCurrentFrequencySelection(app.files, selIds);
         if isempty(freqIdx)
             set(edtFsNum, 'Enable', 'off', 'String', '5000');
             set(btnApplyFs, 'Enable', 'off');
@@ -971,19 +1087,23 @@ set(fig, 'ResizeFcn', @onResize);
         updateTabControlVisibility();
         updateTabSummaries();
         setPopupItemsCompat(ddFreqPlotMode, {'Overlay', 'Subplots'}, app.freqPlotMode);
+        setPopupItemsCompat(ddFreqXAxis, {'Sample Index', 'Time (s)'}, app.freqXAxisMode);
         setPopupItemsCompat(ddPlotMode, {'Subplots', 'Overlay'}, app.logPlotMode);
+        updateFrequencyControlVisibility();
         updateHoldControlState();
         updateDemeanControlState();
     end
 
     function refreshFrequencyPairItems()
         app = getApp();
-        selIds = getSelectedFileIds();
-        freqIdx = findFilesByIdsAndType(app.files, selIds, 'freq');
-        if isempty(freqIdx)
-            freqIdx = findFilesByType(app.files, 'freq');
+        [freqMode, freqIdx] = getCurrentFrequencySelection(app.files, getSelectedFileIds());
+        if strcmp(freqMode, 'frf')
+            items = collectFrequencyPairLabels(app.files, freqIdx);
+        elseif strcmp(freqMode, 'signal')
+            items = collectIvsaSignalSelectionItems(app.files, freqIdx);
+        else
+            items = {};
         end
-        items = collectFrequencyPairLabels(app.files, freqIdx);
         if isempty(items)
             items = {'(none)'};
         end
@@ -1087,6 +1207,7 @@ set(fig, 'ResizeFcn', @onResize);
             set(btnDemean, 'Enable', 'on');
             set(btnLogFigure, 'Enable', 'on');
         end
+        updateFrequencyControlVisibility();
         updateHoldControlState();
         updateDemeanControlState();
     end
@@ -1094,16 +1215,27 @@ set(fig, 'ResizeFcn', @onResize);
     function updateTabSummaries()
         app = getApp();
         selIds = getSelectedFileIds();
-        freqIdx = findFilesByIdsAndType(app.files, selIds, 'freq');
+        [freqMode, freqIdx, freqNote] = getCurrentFrequencySelection(app.files, selIds);
         if isempty(freqIdx)
             set(lblFreqSelected, 'String', 'Selected frequency channels: (no frequency files selected)');
-        else
+        elseif strcmp(freqMode, 'frf')
             pairLabels = getSelectedFrequencyPairLabels(app.files, freqIdx, lstFreqPairs);
             if isempty(pairLabels)
                 pairLabels = collectFrequencyPairLabels(app.files, freqIdx);
             end
             set(lblFreqSelected, 'String', sprintf('Selected frequency channels: %s | mode: %s | files: %d', ...
                 summarizeFrequencySelection(pairLabels), app.freqPlotMode, numel(freqIdx)));
+        else
+            labels = getSelectedIvsaSignalLabels(app.files, freqIdx, lstFreqPairs);
+            if isempty(labels)
+                labels = collectIvsaSignalSelectionItems(app.files, freqIdx);
+            end
+            txt = sprintf('Selected signal channels: %s | mode: %s | x-axis: %s | files: %d', ...
+                summarizeFrequencySelection(labels), app.freqPlotMode, app.freqXAxisMode, numel(freqIdx));
+            if ~isempty(freqNote)
+                txt = sprintf('%s (%s)', txt, freqNote);
+            end
+            set(lblFreqSelected, 'String', txt);
         end
 
         [F, note] = getCurrentLogFile(app.files, selIds);
@@ -1124,9 +1256,11 @@ set(fig, 'ResizeFcn', @onResize);
 
     function updateHoldControlState()
         app = getApp();
+        [freqMode, ~] = getCurrentFrequencySelection(app.files, getSelectedFileIds());
         isFreqSubplots = strcmp(app.activeTab, 'freq') && strcmp(getPopupSelectedString(ddFreqPlotMode), 'Subplots');
+        isFreqSignal = strcmp(app.activeTab, 'freq') && strcmp(freqMode, 'signal');
         isLogSubplots = strcmp(app.activeTab, 'log') && strcmp(getPopupSelectedString(ddPlotMode), 'Subplots');
-        if isFreqSubplots || isLogSubplots
+        if isFreqSubplots || isLogSubplots || isFreqSignal
             app.holdPlots = false;
             setApp(app);
             set(btnHold, 'Enable', 'off', 'Value', 0, 'String', 'Hold: Off');
@@ -1138,6 +1272,13 @@ set(fig, 'ResizeFcn', @onResize);
                 set(btnHold, 'String', 'Hold: Off', 'Value', 0);
             end
         end
+    end
+
+    function updateFrequencyControlVisibility()
+        [freqMode, ~] = getCurrentFrequencySelection(getApp().files, getSelectedFileIds());
+        isSignal = strcmp(freqMode, 'signal');
+        set(lblFreqXAxis, 'Visible', ternaryText(isSignal, 'on', 'off'));
+        set(ddFreqXAxis, 'Visible', ternaryText(isSignal, 'on', 'off'));
     end
 
     function updateDemeanControlState()
@@ -1240,9 +1381,8 @@ set(fig, 'ResizeFcn', @onResize);
     end
 
     function tf = hasSelectedFrequencyFile()
-        app = getApp();
-        selIds = getSelectedFileIds();
-        tf = ~isempty(findFilesByIdsAndType(app.files, selIds, 'freq'));
+        [~, freqIdx] = getCurrentFrequencySelection(getApp().files, getSelectedFileIds());
+        tf = ~isempty(freqIdx);
     end
 
     function tf = hasSelectedLogFile()
@@ -1319,6 +1459,7 @@ app.lastOpenDir = pwd;
 app.activeTab = 'freq';
 app.holdPlots = false;
 app.freqPlotMode = 'Overlay';
+app.freqXAxisMode = 'Sample Index';
 app.logPlotMode = 'Subplots';
 app.logDemean = false;
 app.logRangeFileId = 0;
@@ -1334,8 +1475,12 @@ if ~ismember(ext, {'.dat', '.txt', '.csv'})
 end
 
 scanLines = readTextLinesCompat(filePath, 256);
+signalKind = detectIvsaSignalKind(scanLines, fileName);
 kind = detectAnalysisFileType(scanLines, fileName);
 switch kind
+    case 'ivsa_signal'
+        lines = readTextLinesCompat(filePath);
+        F = parseIvsaSignalAnalysisFile(filePath, lines, signalKind);
     case 'freq'
         lines = readTextLinesCompat(filePath);
         F = parseFrequencyAnalysisFile(filePath, lines);
@@ -1352,6 +1497,11 @@ end
 
 function kind = detectAnalysisFileType(lines, fileName)
 kind = 'log';
+signalKind = detectIvsaSignalKind(lines, fileName);
+if ~isempty(signalKind)
+    kind = 'ivsa_signal';
+    return;
+end
 hasUpdate = false;
 has12NumericLine = false;
 maxScan = min(numel(lines), 60);
@@ -1372,6 +1522,39 @@ if hasUpdate && has12NumericLine
     kind = 'freq';
 elseif ~isempty(regexpi(fileName, '^IVH[FS]A?_', 'once'))
     kind = 'freq';
+end
+end
+
+function signalKind = detectIvsaSignalKind(lines, fileName)
+signalKind = '';
+nameLower = lower(fileName);
+for i = 1:min(numel(lines), 24)
+    s = strtrim(lines{i});
+    if isempty(s)
+        continue;
+    end
+    if contains(lower(s), 'sine test')
+        signalKind = 'sine';
+        return;
+    end
+    if contains(lower(s), 'feedforward signal test')
+        signalKind = 'sff';
+        return;
+    end
+    toks = tokenizeWhitespace(s);
+    if numel(toks) >= 6 && any(contains(lower(toks), '_prox')) && any(contains(lower(toks), '_geo')) && any(contains(lower(toks), '_noise'))
+        signalKind = 'sine';
+        return;
+    end
+    if numel(toks) >= 4 && any(strcmpi(toks, 'X_Acc[um/s^2]')) && any(strcmpi(toks, 'Y_Position[um]'))
+        signalKind = 'sff';
+        return;
+    end
+end
+if contains(nameLower, '_sine_')
+    signalKind = 'sine';
+elseif contains(nameLower, '_sff_')
+    signalKind = 'sff';
 end
 end
 
@@ -1471,6 +1654,90 @@ F.average = average;
 F.dataMatrix = data;
 F.headerNames = headerTokens;
 F.pairs = pairs;
+F.fsNumerator = 5000;
+F.fs = F.fsNumerator / F.update;
+end
+
+function F = parseIvsaSignalAnalysisFile(~, lines, signalKind)
+dataStart = 0;
+update = NaN;
+samples = NaN;
+nCols = NaN;
+headerTokens = {};
+
+for i = 1:numel(lines)
+    line = strtrim(lines{i});
+    if isempty(line)
+        continue;
+    end
+    if isnan(update)
+        v = parseHeaderScalar(line, 'Update');
+        if isnan(v)
+            v = parseHeaderScalar(line, 'Update Rate');
+        end
+        if ~isnan(v)
+            update = v;
+        end
+    end
+    if isnan(samples)
+        v = parseHeaderScalar(line, 'Samples');
+        if ~isnan(v)
+            samples = v;
+        end
+    end
+    [row, ok] = parseAnyNumericLine(line);
+    if ok
+        dataStart = i;
+        nCols = numel(row);
+        break;
+    end
+end
+
+if dataStart < 1 || ~isfinite(nCols) || nCols < 1
+    error('No numeric signal block found.');
+end
+if ~isfinite(update) || update <= 0
+    error('Cannot find a valid Update value in file header.');
+end
+
+for i = dataStart - 1:-1:1
+    toks = tokenizeWhitespace(lines{i});
+    if numel(toks) >= nCols && sum(cellfun(@containsLetterCompat, toks(1:nCols))) >= max(2, floor(nCols / 2))
+        headerTokens = toks(1:nCols);
+        break;
+    end
+end
+if isempty(headerTokens)
+    headerTokens = createGenericHeaders(nCols);
+end
+
+data = zeros(0, nCols);
+for i = dataStart:numel(lines)
+    [row, ok] = parseFixedNumericLine(lines{i}, nCols);
+    if ok
+        data(end + 1, :) = row; %#ok<AGROW>
+    end
+end
+if isempty(data)
+    error('Signal data block is empty.');
+end
+
+if strcmp(signalKind, 'sine')
+    [axisGroups, channelDefs] = buildIvsaSineSignalDefs(headerTokens);
+else
+    [axisGroups, channelDefs] = buildIvsaSffSignalDefs(headerTokens);
+end
+
+F = struct();
+F.type = 'ivsa_signal';
+F.signalKind = signalKind;
+F.update = update;
+F.samples = samples;
+F.dataMatrix = data;
+F.headerNames = headerTokens;
+F.sampleIndex = (1:size(data, 1))';
+F.axisGroups = axisGroups;
+F.channelDefs = channelDefs;
 F.fsNumerator = 5000;
 F.fs = F.fsNumerator / F.update;
 end
@@ -1694,6 +1961,20 @@ if all(isfinite(nums)) && numel(nums) == nCols
 end
 end
 
+function [row, ok] = parseAnyNumericLine(line)
+row = [];
+ok = false;
+toks = tokenizeWhitespace(line);
+if isempty(toks)
+    return;
+end
+nums = str2double(toks);
+if all(isfinite(nums))
+    row = nums(:).';
+    ok = true;
+end
+end
+
 function [timeText, nums, ok] = parseWideDataLine(line, nNumeric)
 timeText = '';
 nums = [];
@@ -1735,6 +2016,78 @@ for i = 1:nPairs
     headers{2 * i - 1} = sprintf('Pair%d_in', i);
     headers{2 * i} = sprintf('Pair%d_out', i);
 end
+end
+
+function [axisGroups, channelDefs] = buildIvsaSineSignalDefs(headerTokens)
+axisNames = {};
+channelDefs = struct('axisName', {}, 'signalName', {}, 'displayName', {}, 'columnIdx', {});
+for i = 1:numel(headerTokens)
+    tok = headerTokens{i};
+    cleanTok = regexprep(tok, '\[[^\]]*\]', '');
+    m = regexp(cleanTok, '^([VH]\d+)_([A-Za-z]+)$', 'tokens', 'once');
+    if isempty(m)
+        continue;
+    end
+    axisName = upperLeadingLetter(upper(strrep(m{1}, ' ', '')));
+    signalName = lower(strtrim(m{2}));
+    if ~any(strcmp(axisNames, axisName))
+        axisNames{end + 1} = axisName; %#ok<AGROW>
+    end
+    channelDefs(end + 1).axisName = axisName; %#ok<AGROW>
+    channelDefs(end).signalName = signalName;
+    channelDefs(end).displayName = sprintf('%s | %s', axisName, signalName);
+    channelDefs(end).columnIdx = i;
+end
+axisGroups = struct('name', {}, 'columnIdx', {}, 'displayNames', {});
+for i = 1:numel(axisNames)
+    mask = strcmp({channelDefs.axisName}, axisNames{i});
+    defs = channelDefs(mask);
+    order = orderIvsaSineSignals({defs.signalName});
+    defs = defs(order);
+    channelDefs(mask) = defs;
+    axisGroups(end + 1).name = axisNames{i}; %#ok<AGROW>
+    axisGroups(end).columnIdx = [defs.columnIdx];
+    axisGroups(end).displayNames = {defs.displayName};
+end
+end
+
+function [axisGroups, channelDefs] = buildIvsaSffSignalDefs(headerTokens)
+channelDefs = struct('axisName', {}, 'signalName', {}, 'displayName', {}, 'columnIdx', {});
+displayNames = cell(1, numel(headerTokens));
+for i = 1:numel(headerTokens)
+    displayNames{i} = formatIvsaSffDisplayName(headerTokens{i});
+    channelDefs(end + 1).axisName = displayNames{i}; %#ok<AGROW>
+    channelDefs(end).signalName = '';
+    channelDefs(end).displayName = displayNames{i};
+    channelDefs(end).columnIdx = i;
+end
+axisGroups = struct('name', 'SFF Signals', 'columnIdx', 1:numel(headerTokens), 'displayNames', {displayNames});
+end
+
+function order = orderIvsaSineSignals(signalNames)
+target = {'prox', 'geo', 'noise'};
+score = zeros(1, numel(signalNames));
+for i = 1:numel(signalNames)
+    hit = find(strcmp(target, signalNames{i}), 1, 'first');
+    if isempty(hit)
+        hit = numel(target) + i;
+    end
+    score(i) = hit;
+end
+[~, order] = sort(score);
+end
+
+function txt = formatIvsaSffDisplayName(headerName)
+txt = regexprep(strtrim(headerName), '\[[^\]]*\]', '');
+txt = strrep(txt, '_', ' ');
+txt = regexprep(txt, '\s+', ' ');
+txt = strtrim(txt);
+parts = regexp(lower(txt), '\s+', 'split');
+for i = 1:numel(parts)
+    parts{i} = upperLeadingLetter(parts{i});
+end
+txt = strjoin(parts, ' ');
+txt = strrep(txt, 'Acc', 'Acc');
 end
 
 function label = derivePairDisplayLabel(inputName, outputName, idx)
@@ -2220,6 +2573,67 @@ for i = 1:numel(curves)
 end
 end
 
+function ax = createSignalHostAxis(parentObj, ttl, xLabelText)
+ax = axes('Parent', parentObj, 'Units', 'normalized', ...
+    'Position', [0.07 0.08 0.89 0.84], 'Box', 'on');
+title(ax, ttl, 'Interpreter', 'none');
+xlabel(ax, xLabelText);
+ylabel(ax, 'Value');
+grid(ax, 'on');
+end
+
+function renderSignalSubplotGridToParent(parentObj, xData, Y, names, layout, groupName, xLabelText)
+axesHandles = createAxesGrid(parentObj, layout, size(Y, 2));
+for i = 1:numel(axesHandles)
+    plot(axesHandles(i), xData, Y(:, i), 'LineWidth', 1.0);
+    grid(axesHandles(i), 'on');
+    title(axesHandles(i), names{i}, 'Interpreter', 'none');
+    styleSignalSubplotAxis(axesHandles(i), i, layout, false, xLabelText);
+    applySignalXLimits(axesHandles(i), xData);
+end
+end
+
+function renderSignalSubplotGridToFigure(hFig, xData, Y, names, layout, figTitle, groupName, xLabelText)
+axesHandles = createAxesGrid(hFig, layout, size(Y, 2));
+for i = 1:numel(axesHandles)
+    plot(axesHandles(i), xData, Y(:, i), 'LineWidth', 1.0);
+    grid(axesHandles(i), 'on');
+    title(axesHandles(i), names{i}, 'Interpreter', 'none');
+    styleSignalSubplotAxis(axesHandles(i), i, layout, true, xLabelText);
+    applySignalXLimits(axesHandles(i), xData);
+end
+try
+    sgtitle(hFig, figTitle, 'Interpreter', 'none');
+catch
+end
+end
+
+function styleSignalSubplotAxis(ax, idx, layout, isExportFigure, xLabelText)
+nRows = layout(1);
+nCols = layout(2);
+row = ceil(idx / nCols);
+col = mod(idx - 1, nCols) + 1;
+if row == nRows
+    xlabel(ax, xLabelText);
+else
+    xlabel(ax, '');
+end
+if col == 1
+    ylabel(ax, 'Value');
+else
+    ylabel(ax, '');
+end
+if isExportFigure
+    set(ax, 'FontSize', 10, 'TitleFontSizeMultiplier', 0.95);
+else
+    set(ax, 'FontSize', 9, 'TitleFontSizeMultiplier', 0.90);
+end
+end
+
+function applySignalXLimits(ax, xData)
+applyLogXLimits(ax, xData);
+end
+
 function items = getListboxItems(h)
 raw = get(h, 'String');
 if isempty(raw)
@@ -2580,6 +2994,8 @@ end
 function label = makeAnalysisFileLabel(F)
 if strcmp(F.type, 'freq')
     label = sprintf('[FR] %s | Update=%g | FsNum=%g', F.displayName, F.update, F.fsNumerator);
+elseif strcmp(F.type, 'ivsa_signal')
+    label = sprintf('[SIG] %s | %s | Update=%g | FsNum=%g', F.displayName, upper(F.signalKind), F.update, F.fsNumerator);
 else
     label = sprintf('[LOG] %s | Ch=%d', F.displayName, size(F.dataMatrix, 2));
 end
@@ -2640,6 +3056,135 @@ for i = 1:numel(freqIdx)
         if ~any(strcmp(labels, F.pairs(k).label))
             labels{end + 1} = F.pairs(k).label; %#ok<AGROW>
         end
+    end
+end
+end
+
+function [freqMode, idx, note] = getCurrentFrequencySelection(files, selectedIds)
+freqMode = 'none';
+idx = [];
+note = '';
+if isempty(files)
+    return;
+end
+selectedFiles = filesByIds(files, selectedIds);
+selectedTypes = {};
+for i = 1:numel(selectedFiles)
+    if any(strcmp(selectedFiles{i}.type, {'freq', 'ivsa_signal'}))
+        selectedTypes{end + 1} = selectedFiles{i}.type; %#ok<AGROW>
+    end
+end
+if isempty(selectedTypes)
+    allSignal = findFilesByType(files, 'ivsa_signal');
+    if ~isempty(allSignal)
+        freqMode = 'signal';
+        idx = allSignal(1);
+        return;
+    end
+    allFreq = findFilesByType(files, 'freq');
+    if ~isempty(allFreq)
+        freqMode = 'frf';
+        idx = allFreq;
+    end
+    return;
+end
+primaryType = selectedTypes{1};
+if strcmp(primaryType, 'freq')
+    freqMode = 'frf';
+else
+    freqMode = 'signal';
+end
+for i = 1:numel(files)
+    if any(files{i}.id == selectedIds) && strcmp(files{i}.type, primaryType)
+        idx(end + 1) = i; %#ok<AGROW>
+    end
+end
+if numel(unique(selectedTypes)) > 1
+    note = 'mixed file types selected, using the first supported type';
+end
+if strcmp(freqMode, 'signal') && numel(idx) > 1
+    idx = idx(1);
+    if isempty(note)
+        note = 'multiple signal files selected, using the first one';
+    end
+end
+end
+
+function items = collectIvsaSignalSelectionItems(files, signalIdx)
+items = {};
+if isempty(signalIdx)
+    return;
+end
+F = files{signalIdx(1)};
+if strcmp(F.signalKind, 'sine')
+    for i = 1:numel(F.axisGroups)
+        items{end + 1} = F.axisGroups(i).name; %#ok<AGROW>
+    end
+else
+    items = {F.channelDefs.displayName};
+end
+end
+
+function labels = getSelectedIvsaSignalLabels(files, signalIdx, hList)
+items = getListboxItems(hList);
+if isempty(items) || (numel(items) == 1 && strcmp(items{1}, '(none)'))
+    labels = {};
+    return;
+end
+sel = getListSelectionIndices(hList, numel(items));
+if isempty(sel)
+    labels = collectIvsaSignalSelectionItems(files, signalIdx);
+else
+    labels = items(sel);
+end
+end
+
+function [xData, Y, names, groupName, xLabelText] = buildIvsaSignalPlotData(F, selectedLabels, xAxisMode)
+colIdx = [];
+names = {};
+if strcmp(F.signalKind, 'sine')
+    for i = 1:numel(selectedLabels)
+        G = findIvsaSignalAxisGroup(F, selectedLabels{i});
+        if isempty(G)
+            continue;
+        end
+        colIdx = [colIdx, G.columnIdx]; %#ok<AGROW>
+        names = [names, G.displayNames]; %#ok<AGROW>
+    end
+    groupName = 'Sine Signals';
+else
+    for i = 1:numel(selectedLabels)
+        dIdx = find(strcmp({F.channelDefs.displayName}, selectedLabels{i}), 1, 'first');
+        if isempty(dIdx)
+            continue;
+        end
+        colIdx(end + 1) = F.channelDefs(dIdx).columnIdx; %#ok<AGROW>
+        names{end + 1} = F.channelDefs(dIdx).displayName; %#ok<AGROW>
+    end
+    groupName = 'SFF Signals';
+end
+if isempty(colIdx)
+    xData = [];
+    Y = [];
+    xLabelText = 'Sample Index';
+    return;
+end
+xData = F.sampleIndex;
+if strcmp(xAxisMode, 'Time (s)')
+    xData = (double(F.sampleIndex) - 1) ./ F.fs;
+    xLabelText = 'Time (s)';
+else
+    xLabelText = 'Sample Index';
+end
+Y = F.dataMatrix(:, colIdx);
+end
+
+function G = findIvsaSignalAxisGroup(F, groupName)
+G = [];
+for i = 1:numel(F.axisGroups)
+    if strcmp(F.axisGroups(i).name, groupName)
+        G = F.axisGroups(i);
+        return;
     end
 end
 end

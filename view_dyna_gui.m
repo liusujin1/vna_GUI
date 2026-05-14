@@ -5,10 +5,14 @@ function view_dyna_gui()
 % - Ö§³ÖÊ±Óò¡¢PSD¡¢ÀÛ¼ÆÆ×¡¢´«µÝÂÊºÍÏà¸ÉÐÔÏÔÊ¾
 % - Ö§³ÖÊ±ÓòµÍÍ¨/¸ßÍ¨ÂË²¨ÒÔ¼°µØ»ùÕñ¶¯·ÖÎö
 
-% ¸ù¾ÝÆÁÄ»·Ö±æÂÊ¼ÆËã³õÊ¼´°¿Ú³ß´ç£¬²¢±£Áô×îÐ¡ÏÔÊ¾¿Õ¼ä
+% ¸ù¾ÝÆÁÄ»·Ö±æÂÊ¼ÆËã³õÊ¼´°¿Ú³ß´ç£¨×ÔÊÊÓ¦£¬²»¹Ì¶¨£©
 screenSz = get(0, 'ScreenSize');
-figW = max(1220, min(round(screenSz(3) * 0.80), 1420));
-figH = max(760, min(round(screenSz(4) * 0.76), 820));
+availW = max(640, screenSz(3) - 40);
+availH = max(480, screenSz(4) - 80);
+minFigW = min(max(900, round(screenSz(3) * 0.60)), availW);
+minFigH = min(max(620, round(screenSz(4) * 0.60)), availH);
+figW = max(minFigW, min(round(screenSz(3) * 0.82), availW));
+figH = max(minFigH, min(round(screenSz(4) * 0.80), availH));
 figX = max(20, round((screenSz(3) - figW) / 2));
 figY = max(20, round((screenSz(4) - figH) / 2));
 
@@ -258,10 +262,14 @@ ddSel1 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
     'String', {'Ê±Óò', 'PSD', 'ÀÛ¼ÆÆ×', '´«µÝÂÊ', 'Ïà¸ÉÐÔ'}, ...
     'Value', 1, ...
     'BackgroundColor', 'w', ...
+    'Callback', @onMainAxisModeChanged, ...
     'Position', [440 868 110 24]);
 btnFig1 = uicontrol('Parent', tabMain, 'Style', 'pushbutton', ...
     'String', 'Í¼´°', ...
     'Position', [556 866 62 26]);
+btnExport1 = uicontrol('Parent', tabMain, 'Style', 'pushbutton', ...
+    'String', 'µ¼³öÊý¾Ý', ...
+    'Position', [624 866 80 26]);
 
 lblSel2 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'String', 'Í¼´° 2:', ...
@@ -271,10 +279,14 @@ ddSel2 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
     'String', {'Ê±Óò', 'PSD', 'ÀÛ¼ÆÆ×', '´«µÝÂÊ', 'Ïà¸ÉÐÔ'}, ...
     'Value', 2, ...
     'BackgroundColor', 'w', ...
+    'Callback', @onMainAxisModeChanged, ...
     'Position', [440 618 110 24]);
 btnFig2 = uicontrol('Parent', tabMain, 'Style', 'pushbutton', ...
     'String', 'Í¼´°', ...
     'Position', [556 616 62 26]);
+btnExport2 = uicontrol('Parent', tabMain, 'Style', 'pushbutton', ...
+    'String', 'µ¼³öÊý¾Ý', ...
+    'Position', [624 616 80 26]);
 
 lblSel3 = uicontrol('Parent', tabMain, 'Style', 'text', ...
     'String', 'Í¼´° 3:', ...
@@ -284,10 +296,14 @@ ddSel3 = uicontrol('Parent', tabMain, 'Style', 'popupmenu', ...
     'String', {'Ê±Óò', 'PSD', 'ÀÛ¼ÆÆ×', '´«µÝÂÊ', 'Ïà¸ÉÐÔ'}, ...
     'Value', 4, ...
     'BackgroundColor', 'w', ...
+    'Callback', @onMainAxisModeChanged, ...
     'Position', [440 368 110 24]);
 btnFig3 = uicontrol('Parent', tabMain, 'Style', 'pushbutton', ...
     'String', 'Í¼´°', ...
     'Position', [556 366 62 26]);
+btnExport3 = uicontrol('Parent', tabMain, 'Style', 'pushbutton', ...
+    'String', 'µ¼³öÊý¾Ý', ...
+    'Position', [624 366 80 26]);
 
 % Ö÷½çÃæÈý·ùÍ¼£ºÊ±Óò¡¢PSD ºÍ´«µÝÂÊ/Ïà¸ÉÐÔµÈ
 axMain1 = axes('Parent', tabMain, 'Units', 'pixels', 'Position', [20 585 1030 235], 'Box', 'on');
@@ -415,12 +431,23 @@ btnFoundVibFig = uicontrol('Parent', tabFoundation, 'Style', 'pushbutton', ...
 btnFoundStiffCohFig = uicontrol('Parent', tabFoundation, 'Style', 'pushbutton', ...
     'String', 'Í¼´°', ...
     'Position', [980 420 62 26]);
+btnFoundVibExport = uicontrol('Parent', tabFoundation, 'Style', 'pushbutton', ...
+    'String', 'µ¼³öÊý¾Ý', ...
+    'Position', [980 688 62 26]);
+btnFoundStiffCohExport = uicontrol('Parent', tabFoundation, 'Style', 'pushbutton', ...
+    'String', 'µ¼³öÊý¾Ý', ...
+    'Position', [980 388 62 26]);
 
 set(btnFig1, 'Callback', @(~, ~) onOpenAxisFigure(axMain1, 'Í¼´° 1'));
 set(btnFig2, 'Callback', @(~, ~) onOpenAxisFigure(axMain2, 'Í¼´° 2'));
 set(btnFig3, 'Callback', @(~, ~) onOpenAxisFigure(axMain3, 'Í¼´° 3'));
+set(btnExport1, 'Callback', @(~, ~) onExportAxisData(axMain1, 'Í¼´° 1'));
+set(btnExport2, 'Callback', @(~, ~) onExportAxisData(axMain2, 'Í¼´° 2'));
+set(btnExport3, 'Callback', @(~, ~) onExportAxisData(axMain3, 'Í¼´° 3'));
 set(btnFoundVibFig, 'Callback', @onOpenFoundationVibFigure);
 set(btnFoundStiffCohFig, 'Callback', @onOpenFoundationStiffCohFigure);
+set(btnFoundVibExport, 'Callback', @onExportFoundationVibData);
+set(btnFoundStiffCohExport, 'Callback', @onExportFoundationStiffCohData);
 refreshFoundationFileSelectors();
 
 % °ó¶¨´°¿Ú³ß´ç±ä»¯»Øµ÷£¬²¢Ö´ÐÐÒ»´Î³õÊ¼²¼¾Ö
@@ -432,8 +459,11 @@ onResize();
         figPos = get(fig, 'Position');
         fw = figPos(3);
         fh = figPos(4);
-        minW = 1220;
-        minH = 760;
+        screenNow = get(0, 'ScreenSize');
+        availWNow = max(640, screenNow(3) - 40);
+        availHNow = max(480, screenNow(4) - 80);
+        minW = min(max(900, round(screenNow(3) * 0.60)), availWNow);
+        minH = min(max(620, round(screenNow(4) * 0.60)), availHNow);
         if fw < minW || fh < minH
             figPos(3) = max(fw, minW);
             figPos(4) = max(fh, minH);
@@ -691,9 +721,11 @@ onResize();
         selLabelW = 45;
         selW = 110;
         figBtnW = 62;
+        exportBtnW = 80;
         selLabelX = mPadX;
         selX = selLabelX + selLabelW + 6;
         figBtnX = selX + selW + 6;
+        exportBtnX = figBtnX + figBtnW + 6;
 
         top1 = th - mTopPad - rowH;
         top2 = top1 - mRowGap - rowH;
@@ -702,16 +734,19 @@ onResize();
         set(lblSel1, 'Position', [selLabelX, top1 + rowH - selH + 2, selLabelW, 22]);
         set(ddSel1, 'Position', [selX, top1 + rowH - selH, selW, selH]);
         set(btnFig1, 'Position', [figBtnX, top1 + rowH - selH - 1, figBtnW, 26]);
+        set(btnExport1, 'Position', [exportBtnX, top1 + rowH - selH - 1, exportBtnW, 26]);
         set(axMain1, 'OuterPosition', [axX, top1, axW, axH]);
 
         set(lblSel2, 'Position', [selLabelX, top2 + rowH - selH + 2, selLabelW, 22]);
         set(ddSel2, 'Position', [selX, top2 + rowH - selH, selW, selH]);
         set(btnFig2, 'Position', [figBtnX, top2 + rowH - selH - 1, figBtnW, 26]);
+        set(btnExport2, 'Position', [exportBtnX, top2 + rowH - selH - 1, exportBtnW, 26]);
         set(axMain2, 'OuterPosition', [axX, top2, axW, axH]);
 
         set(lblSel3, 'Position', [selLabelX, top3 + rowH - selH + 2, selLabelW, 22]);
         set(ddSel3, 'Position', [selX, top3 + rowH - selH, selW, selH]);
         set(btnFig3, 'Position', [figBtnX, top3 + rowH - selH - 1, figBtnW, 26]);
+        set(btnExport3, 'Position', [exportBtnX, top3 + rowH - selH - 1, exportBtnW, 26]);
         set(axMain3, 'OuterPosition', [axX, top3, axW, axH]);
 
         % Foundation tab layout.
@@ -785,6 +820,10 @@ onResize();
         stiffBtnY = max(fAxMidY + fAxMidH - fBtnH - 2, fAxMidY + 2);
         set(btnFoundVibFig, 'Position', [fBtnX, vibBtnY, fBtnW, fBtnH]);
         set(btnFoundStiffCohFig, 'Position', [fBtnX, stiffBtnY, fBtnW, fBtnH]);
+        vibExportY = max(vibBtnY - fBtnH - 4, fAxTopY + 2);
+        stiffExportY = max(stiffBtnY - fBtnH - 4, fAxMidY + 2);
+        set(btnFoundVibExport, 'Position', [fBtnX, vibExportY, fBtnW, fBtnH]);
+        set(btnFoundStiffCohExport, 'Position', [fBtnX, stiffExportY, fBtnW, fBtnH]);
     end
 
     % ¼ÓÔØÊý¾ÝÎÄ¼þ£¨Ö§³Ö¶àÑ¡£©£¬²¢ÖØ½¨Êý¾ÝÏîÁÐ±í
@@ -963,7 +1002,59 @@ onResize();
         % Source selection should immediately refresh foundation plots.
         plotFoundationPage(app, false, true);
     end
+    function onMainAxisModeChanged(~, ~)
+        app = getappdata(fig, 'app');
+        if ~app.loaded || isempty(app.files)
+            return;
+        end
+        if isFoundationTabSelected(tabRight, tabFoundation)
+            return;
+        end
+        selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
+        if isempty(selectedSeries)
+            return;
+        end
+        onPlot([], []);
+    end
 
+    function onExportAxisData(sourceAx, fallbackTitle)
+        lineHandles = getLineChildren(sourceAx);
+        if isempty(lineHandles)
+            showAlertCompat(fig, 'µ±Ç°Í¼ÏñÎª¿Õ£¬ÇëÏÈ»æÍ¼¡£', 'ÌáÊ¾');
+            return;
+        end
+
+        figName = getAxisExportTitle(sourceAx, fallbackTitle);
+        safeName = sanitizeDatColumnName(figName);
+        defaultName = [safeName '.dat'];
+        [saveFile, savePath, filterIndex] = uiputfile( ...
+            {'*.dat', 'DAT ÎÄ¼þ (*.dat)'; '*.mat', 'MAT ÎÄ¼þ (*.mat)'; '*.xlsx', 'Excel ÎÄ¼þ (*.xlsx)'}, ...
+            'µ¼³öÍ¼´°Êý¾Ý', defaultName);
+        if isequal(saveFile, 0) || isequal(savePath, 0)
+            set(lblStatus, 'String', '×´Ì¬: ÒÑÈ¡Ïûµ¼³öÍ¼´°Êý¾Ý');
+            return;
+        end
+
+        outPath = fullfile(savePath, saveFile);
+        [~, ~, ext] = fileparts(outPath);
+        if isempty(ext)
+            switch filterIndex
+                case 2
+                    outPath = [outPath '.mat'];
+                case 3
+                    outPath = [outPath '.xlsx'];
+                otherwise
+                    outPath = [outPath '.dat'];
+            end
+        end
+
+        [ok, errMsg] = writeAxisLinesToFile(sourceAx, outPath);
+        if ~ok
+            showAlertCompat(fig, errMsg, 'µ¼³öÊ§°Ü');
+            return;
+        end
+        set(lblStatus, 'String', sprintf('×´Ì¬: Í¼´°Êý¾ÝÒÑµ¼³öµ½ %s', outPath));
+    end
     function onPlot(~, ~)
         app = getappdata(fig, 'app');
         if ~app.loaded || isempty(app.files)
@@ -1021,7 +1112,7 @@ onResize();
         end
     end
 
-    % å°†æŒ‡å®šè½´å½“å‰å†…å®¹å¤åˆ¶åˆ°å•ç‹?Figureï¼Œä¾¿äºŽä¿å­˜å›¾ç‰?
+% ½«Ö¸¶¨Öáµ±Ç°ÄÚÈÝ¸´ÖÆµ½µ¥¶À Figure£¬±ãÓÚ±£´æÍ¼Æ¬
     function onOpenAxisFigure(sourceAx, fallbackTitle)
         if countLineLikeChildren(sourceAx) == 0
         showAlertCompat(fig, 'µ±Ç°Í¼ÏñÎª¿Õ£¬ÇëÏÈ»æÍ¼¡£', 'ÌáÊ¾');
@@ -1054,7 +1145,49 @@ onResize();
         set(lblStatus, 'String', '×´Ì¬: ÒÑÔÚÍ¬Ò»Í¼´°ÖÐ´ò¿ªµØ»ù¸Õ¶È/Ïà¸ÉÐÔ');
     end
 
-    % ÔÚÖØÃüÃûÊäÈë¿ò°´»Ø³µÊ±´¥·¢ÖØÃüÃû
+
+    function onExportFoundationVibData(~, ~)
+        onExportAxisData(axFoundVib, 'µØÃæÕñ¶¯');
+    end
+
+    function onExportFoundationStiffCohData(~, ~)
+        hasStiff = countLineLikeChildren(axFoundStiff) > 0;
+        hasCoh = countLineLikeChildren(axFoundCoh) > 0;
+        if ~hasStiff && ~hasCoh
+            showAlertCompat(fig, 'µØ»ù¸Õ¶È/Ïà¸ÉÐÔÍ¼Îª¿Õ£¬ÇëÏÈ»æÍ¼¡£', 'ÌáÊ¾');
+            return;
+        end
+
+        safeName = sanitizeDatColumnName('¶¯Ì¬¸Õ¶È_Ïà¸ÉÐÔ');
+        defaultName = [safeName '.dat'];
+        [saveFile, savePath, filterIndex] = uiputfile( ...
+            {'*.dat', 'DAT ÎÄ¼þ (*.dat)'; '*.mat', 'MAT ÎÄ¼þ (*.mat)'; '*.xlsx', 'Excel ÎÄ¼þ (*.xlsx)'}, ...
+            'µ¼³öµØ»ù¸Õ¶È/Ïà¸ÉÐÔÊý¾Ý', defaultName);
+        if isequal(saveFile, 0) || isequal(savePath, 0)
+            set(lblStatus, 'String', '×´Ì¬: ÒÑÈ¡Ïûµ¼³öÍ¼´°Êý¾Ý');
+            return;
+        end
+
+        outPath = fullfile(savePath, saveFile);
+        [~, ~, ext] = fileparts(outPath);
+        if isempty(ext)
+            switch filterIndex
+                case 2
+                    outPath = [outPath '.mat'];
+                case 3
+                    outPath = [outPath '.xlsx'];
+                otherwise
+                    outPath = [outPath '.dat'];
+            end
+        end
+
+        [ok, errMsg] = writeTwoAxesLinesToFile(axFoundStiff, 'stiff', axFoundCoh, 'coh', outPath);
+        if ~ok
+            showAlertCompat(fig, errMsg, 'µ¼³öÊ§°Ü');
+            return;
+        end
+        set(lblStatus, 'String', sprintf('×´Ì¬: Í¼´°Êý¾ÝÒÑµ¼³öµ½ %s', outPath));
+    end    % ÔÚÖØÃüÃûÊäÈë¿ò°´»Ø³µÊ±´¥·¢ÖØÃüÃû
     function onRenameEdited(~, ~)
         renameSelectedFromField(false);
     end
@@ -1609,15 +1742,15 @@ onResize();
         end
 
         if isempty(app.files)
-            set(ddVibFile, 'String', {'(ç©?'}, 'Value', 1, 'Enable', 'off', 'UserData', NaN);
-            set(ddStiffFile, 'String', {'(ç©?'}, 'Value', 1, 'Enable', 'off', 'UserData', NaN);
+            set(ddVibFile, 'String', {'(¿Õ)'}, 'Value', 1, 'Enable', 'off', 'UserData', NaN);
+            set(ddStiffFile, 'String', {'(¿Õ)'}, 'Value', 1, 'Enable', 'off', 'UserData', NaN);
             return;
         end
 
         n = numel(app.files);
         items = cell(1, n + 1);
         ids = nan(1, n + 1);
-        items{1} = '(ç©?';
+        items{1} = '(¿Õ)';
         ids(1) = NaN;
         for i = 1:n
             F = app.files{i};
@@ -1744,7 +1877,7 @@ onResize();
                 msgParts{end + 1} = ['Ïà¸ÉÐÔÒÑÌø¹ý£¨' msg '£©']; %#ok<AGROW>
             end
         else
-            msgParts{end + 1} = '¸Õ¶ÈÎÄ¼þ²»¿ÉÓÃ'; %#ok<AGROW>
+            msgParts{end + 1} = '¸Õ¶ÈÎÄ¼þ²»¿ÉÓÃ'; 
             msgParts{end + 1} = 'Ïà¸ÉÐÔÎÄ¼þ²»¿ÉÓÃ'; %#ok<AGROW>
         end
 
@@ -1945,7 +2078,7 @@ catch
 end
 end
 
-% èŽ·å–æŸé€šé“ PSDï¼ˆä¼˜å…ˆä½¿ç”¨æ–‡ä»¶å†…é¢‘è°±ï¼Œå¦åˆ™å›žé€€ FFTï¼?
+% »ñÈ¡Ä³Í¨µÀ PSD£¨ÓÅÏÈÊ¹ÓÃÎÄ¼þÄÚÆµÆ×£¬·ñÔò»ØÍË FFT£©
 function [f, psd] = getPsdForChannel(F, ch)
 f = [];
 psd = [];
@@ -1973,7 +2106,7 @@ f = f(valid);
 psd = psd(valid);
 end
 
-% è®¡ç®—ä¼ é€’çŽ‡ï¼ˆé€šé“/å‚è€ƒé€šé“ï¼‰å¹¶è½¬æ¢ä¸?dB
+% ¼ÆËã´«µÝÂÊ£¨Í¨µÀ/²Î¿¼Í¨µÀ£©²¢×ª»»Îª dB
 function [f, trDb] = getTransRatio(F, ch, refCh)
 f = [];
 trDb = [];
@@ -2413,7 +2546,7 @@ if ~keepExisting
 end
 
 if ~isempty(skippedResp)
-    msg = ['å·²è·³è¿‡åˆšåº¦é€šé“: ' formatChannelList(skippedResp)];
+    msg = ['å·²è·³è¿‡åˆšåº¦é?é? ' formatChannelList(skippedResp)];
 end
 ok = true;
 end
@@ -2985,7 +3118,7 @@ else
 end
 end
 
-% èŽ·å–å·¥ç¨‹å•ä½æ¢ç®—ç³»æ•° eu_valï¼ˆç¼ºçœä¸º 1ï¼?
+% »ñÈ¡¹¤³Ìµ¥Î»»»ËãÏµÊý eu_val£¨È±Ê¡Îª 1£©
 function eu = getEuVal(sc)
 if isfield(sc, 'eu_val') && ~isempty(sc.eu_val) && isfinite(sc.eu_val)
     eu = sc.eu_val;
@@ -3024,7 +3157,7 @@ else
 end
 end
 
-% æ ¹æ®å·²åŠ è½½æ–‡ä»¶é‡å»ºâ€œæ•°æ®é¡¹åˆ—è¡¨â€ï¼ˆæ–‡ä»¶+é€šé“ï¼?
+% ¸ù¾ÝÒÑ¼ÓÔØÎÄ¼þÖØ½¨¡°Êý¾ÝÏîÁÐ±í¡±£¨ÎÄ¼þ+Í¨µÀ£©
 function app = rebuildSeriesList(app)
 app = pruneCustomSeriesLabels(app);
 app = pruneCustomSeriesScales(app);
@@ -3097,7 +3230,7 @@ if isempty(label)
 end
 end
 
-% æŸ¥è¯¢æŒ‡å®šæ–‡ä»¶+é€šé“çš„è‡ªå®šä¹‰æ˜¾ç¤ºå?
+% ²éÑ¯Ö¸¶¨ÎÄ¼þ+Í¨µÀµÄ×Ô¶¨ÒåÏÔÊ¾Ãû
 function name = getSeriesDisplayFileName(fileName)
 name = fileName;
 if iscell(name)
@@ -3146,7 +3279,7 @@ for i = 1:numel(app.customSeriesNames)
 end
 end
 
-% è®¾ç½®/æ›´æ–°æŒ‡å®šæ–‡ä»¶+é€šé“çš„è‡ªå®šä¹‰æ˜¾ç¤ºå?
+% ÉèÖÃ/¸üÐÂÖ¸¶¨ÎÄ¼þ+Í¨µÀµÄ×Ô¶¨ÒåÏÔÊ¾Ãû
 function app = setCustomSeriesLabel(app, fileId, ch, label)
 found = false;
 for i = 1:numel(app.customSeriesNames)
@@ -3205,7 +3338,7 @@ for i = 1:numel(series)
 end
 end
 
-% ä»?series æ¡ç›®è§£æž fileIdï¼ˆå…¼å®¹æ—§å­—æ®µï¼?
+% ´Ó series ÌõÄ¿½âÎö fileId£¨¼æÈÝ¾É×Ö¶Î£©
 function fileId = getSeriesFileId(S, app)
 if isfield(S, 'fileId') && ~isempty(S.fileId)
     fileId = S.fileId;
@@ -3222,7 +3355,7 @@ if isfield(S, 'fileIdx') && ~isempty(S.fileIdx)
 end
 end
 
-% æŒ‰æ˜¾ç¤ºåä»?series ä¸­ç­›é€‰å‡ºå·²é€‰æ•°æ®é¡¹
+% °´ÏÔÊ¾Ãû´Ó series ÖÐÉ¸Ñ¡³öÒÑÑ¡Êý¾ÝÏî
 function selectedSeries = getSelectedSeries(series, selectedLabels)
 if isempty(series) || isempty(selectedLabels)
     selectedSeries = {};
@@ -3322,7 +3455,315 @@ idx = mod(round(idx) - 1, size(palette, 1)) + 1;
 c = palette(idx, :);
 end
 
-% Í³¼Æ×ø±êÖáÖÐ line ¶ÔÏóÊýÁ¿£¬ÓÃÓÚÑÕÉ«Ðø½Ó
+function lineHandles = getLineChildren(ax)
+lineHandles = [];
+try
+    kids = get(ax, 'Children');
+    if isempty(kids)
+        return;
+    end
+    for i = 1:numel(kids)
+        if strcmp(get(kids(i), 'Type'), 'line')
+            lineHandles = [lineHandles; kids(i)]; %#ok<AGROW>
+        end
+    end
+catch
+    lineHandles = [];
+end
+lineHandles = flipud(lineHandles);
+end
+
+
+function [ok, errMsg] = writeAxisLinesToFile(ax, outPath)
+ok = false;
+errMsg = '';
+
+[data, headers, lineNames, errMsg] = buildAxisLineExportData(ax);
+if ~isempty(errMsg)
+    return;
+end
+
+[~, ~, ext] = fileparts(outPath);
+ext = lower(ext);
+if isempty(ext)
+    ext = '.dat';
+end
+
+switch ext
+    case '.dat'
+        [ok, errMsg] = writeDatFromMatrix(outPath, headers, data);
+    case '.mat'
+        exportData = data;
+        exportHeaders = headers;
+        exportLineNames = lineNames;
+        try
+            save(outPath, 'exportData', 'exportHeaders', 'exportLineNames');
+            ok = true;
+        catch ME
+            errMsg = ME.message;
+        end
+    case '.xlsx'
+        [ok, errMsg] = writeXlsxFromMatrix(outPath, headers, data);
+    otherwise
+        errMsg = sprintf('²»Ö§³ÖµÄµ¼³ö¸ñÊ½: %s', ext);
+end
+end
+
+function [data, headers, lineNames, errMsg] = buildAxisLineExportData(ax)
+data = [];
+headers = {};
+lineNames = {};
+errMsg = '';
+
+lineHandles = getLineChildren(ax);
+if isempty(lineHandles)
+    errMsg = 'µ±Ç°Í¼ÏñÎª¿Õ£¬ÇëÏÈ»æÍ¼¡£';
+    return;
+end
+
+numLines = numel(lineHandles);
+maxN = 0;
+for i = 1:numLines
+    x = get(lineHandles(i), 'XData');
+    y = get(lineHandles(i), 'YData');
+    n = min(numel(x), numel(y));
+    maxN = max(maxN, n);
+end
+if maxN < 1
+    errMsg = 'Í¼ÖÐÃ»ÓÐ¿Éµ¼³öµÄÓÐÐ§Êý¾Ýµã¡£';
+    return;
+end
+
+data = nan(maxN, numLines * 2);
+headers = cell(1, numLines * 2);
+lineNames = cell(1, numLines);
+for i = 1:numLines
+    x = get(lineHandles(i), 'XData');
+    y = get(lineHandles(i), 'YData');
+    n = min(numel(x), numel(y));
+    x = x(:);
+    y = y(:);
+    baseName = sanitizeDatColumnName(get(lineHandles(i), 'DisplayName'));
+    if isempty(baseName)
+        baseName = sprintf('curve_%d', i);
+    end
+
+    c1 = 2 * i - 1;
+    c2 = 2 * i;
+    headers{c1} = [baseName '_X'];
+    headers{c2} = [baseName '_Y'];
+    lineNames{i} = baseName;
+    if n > 0
+        data(1:n, c1) = x(1:n);
+        data(1:n, c2) = y(1:n);
+    end
+end
+end
+
+function [ok, errMsg] = writeDatFromMatrix(outPath, headers, data)
+ok = false;
+errMsg = '';
+fid = fopen(outPath, 'w');
+if fid < 0
+    errMsg = sprintf('ÎÞ·¨Ð´ÈëÎÄ¼þ: %s', outPath);
+    return;
+end
+cleaner = onCleanup(@() fclose(fid)); %#ok<NASGU>
+
+fprintf(fid, '%s\n', strjoin(headers, sprintf('\t')));
+for r = 1:size(data, 1)
+    for c = 1:size(data, 2)
+        if c > 1
+            fprintf(fid, '\t');
+        end
+        v = data(r, c);
+        if isnan(v)
+            fprintf(fid, 'NaN');
+        else
+            fprintf(fid, '%.12g', v);
+        end
+    end
+    fprintf(fid, '\n');
+end
+ok = true;
+end
+
+function [ok, errMsg] = writeXlsxFromMatrix(outPath, headers, data)
+ok = false;
+errMsg = '';
+excelData = [headers; num2cell(data)];
+
+try
+    writeXlsxViaActiveX(outPath, excelData);
+    ok = true;
+    return;
+catch ME0
+end
+
+try
+    xlswrite(outPath, excelData, 1, 'A1');
+    ok = true;
+    return;
+catch ME1
+end
+
+try
+    % MATLAB 2016 ¿É³¢ÊÔ basic Ä£Ê½£¨ÎÞ Excel »·¾³µÄ¶µµ×£©
+    xlswrite(outPath, excelData, 'basic');
+    ok = true;
+catch ME2
+    errMsg = sprintf('Ð´Èë XLSX Ê§°Ü¡£ActiveX: %s | ÆÕÍ¨Ä£Ê½: %s | basic Ä£Ê½: %s¡£Çë¼ì²é±¾»ú Excel/Office ×é¼þ¡£', ME0.message, ME1.message, ME2.message);
+end
+end
+
+function writeXlsxViaActiveX(outPath, excelData)
+excel = [];
+wb = [];
+try
+    excel = actxserver('Excel.Application');
+    set(excel, 'Visible', 0);
+    set(excel, 'DisplayAlerts', 0);
+    wb = excel.Workbooks.Add;
+    ws = wb.Worksheets.Item(1);
+
+    rows = size(excelData, 1);
+    cols = size(excelData, 2);
+    if rows > 0 && cols > 0
+        dataCell = excelData;
+        for r = 2:rows
+            for c = 1:cols
+                v = dataCell{r, c};
+                if isnumeric(v) && isscalar(v) && isnan(v)
+                    dataCell{r, c} = '';
+                end
+            end
+        end
+        rg = ws.Range(ws.Cells(1, 1), ws.Cells(rows, cols));
+        rg.Value2 = dataCell;
+    end
+
+    if exist(outPath, 'file'), delete(outPath); end
+    wb.SaveCopyAs(outPath);
+    wb.Close(false);
+    excel.Quit;
+catch ME
+    try
+        if ~isempty(wb)
+            wb.Close(false);
+        end
+    catch
+    end
+    try
+        if ~isempty(excel)
+            excel.Quit;
+        end
+    catch
+    end
+    error(ME.message);
+end
+end
+
+function [ok, errMsg] = writeTwoAxesLinesToFile(ax1, prefix1, ax2, prefix2, outPath)
+ok = false;
+errMsg = '';
+
+[data1, headers1, lineNames1, errMsg] = buildAxisLineExportDataWithPrefix(ax1, prefix1);
+if ~isempty(errMsg)
+    data1 = [];
+    headers1 = {};
+    lineNames1 = {};
+end
+[data2, headers2, lineNames2, errMsg2] = buildAxisLineExportDataWithPrefix(ax2, prefix2);
+if ~isempty(errMsg2)
+    data2 = [];
+    headers2 = {};
+    lineNames2 = {};
+end
+if isempty(data1) && isempty(data2)
+    errMsg = 'Í¼ÖÐÃ»ÓÐ¿Éµ¼³öµÄÓÐÐ§Êý¾Ýµã¡£';
+    return;
+end
+
+rowN = max(size(data1, 1), size(data2, 1));
+colN = size(data1, 2) + size(data2, 2);
+allData = nan(rowN, colN);
+allHeaders = [headers1 headers2];
+allLineNames = [lineNames1 lineNames2];
+
+if ~isempty(data1)
+    allData(1:size(data1, 1), 1:size(data1, 2)) = data1;
+end
+if ~isempty(data2)
+    c0 = size(data1, 2);
+    allData(1:size(data2, 1), c0 + (1:size(data2, 2))) = data2;
+end
+
+[~, ~, ext] = fileparts(outPath);
+ext = lower(ext);
+if isempty(ext)
+    ext = '.dat';
+end
+switch ext
+    case '.dat'
+        [ok, errMsg] = writeDatFromMatrix(outPath, allHeaders, allData);
+    case '.mat'
+        exportData = allData;
+        exportHeaders = allHeaders;
+        exportLineNames = allLineNames;
+        try
+            save(outPath, 'exportData', 'exportHeaders', 'exportLineNames');
+            ok = true;
+        catch ME
+            errMsg = ME.message;
+        end
+    case '.xlsx'
+        [ok, errMsg] = writeXlsxFromMatrix(outPath, allHeaders, allData);
+    otherwise
+        errMsg = sprintf('²»Ö§³ÖµÄµ¼³ö¸ñÊ½: %s', ext);
+end
+end
+
+function [data, headers, lineNames, errMsg] = buildAxisLineExportDataWithPrefix(ax, prefix)
+[data, headers, lineNames, errMsg] = buildAxisLineExportData(ax);
+if ~isempty(errMsg)
+    return;
+end
+if isempty(prefix)
+    return;
+end
+prefix = sanitizeDatColumnName(prefix);
+if isempty(prefix)
+    return;
+end
+for i = 1:numel(headers)
+    headers{i} = [upper(prefix) '_' headers{i}];
+end
+for i = 1:numel(lineNames)
+    lineNames{i} = [upper(prefix) '_' lineNames{i}];
+end
+end
+function name = sanitizeDatColumnName(name)
+if iscell(name)
+    if isempty(name)
+        name = '';
+    else
+        name = name{1};
+    end
+end
+if ~ischar(name)
+    name = '';
+end
+name = strtrim(name);
+if isempty(name)
+    return;
+end
+name = regexprep(name, '\s+', '_');
+name = regexprep(name, '[^A-Za-z0-9_\-\.]', '_');
+name = regexprep(name, '_+', '_');
+name = regexprep(name, '^_+', '');
+name = regexprep(name, '_+$', '');
+end
+
 function n = countLineLikeChildren(ax)
 n = 0;
 try
@@ -3372,7 +3813,7 @@ copyAxisContent(sourceAx, newAx, legendLoc);
 enableInteractiveFigureCompat(hFig);
 end
 
-% å°†ä¸¤ä¸ªåæ ‡è½´å¤åˆ¶åˆ°åŒä¸€ Figure çš?subplot(211/212) ä¸?
+% ½«Á½¸ö×ø±êÖá¸´ÖÆµ½Í¬Ò» Figure µÄ subplot(211/212) ÖÐ
 function cloneTwoAxesToFigure(sourceAxTop, sourceAxBottom, figName, legendLoc)
 if nargin < 4 || isempty(legendLoc)
     legendLoc = 'northeast';
@@ -3394,7 +3835,7 @@ copyAxisContent(sourceAxBottom, newAxBottom, legendLoc);
 enableInteractiveFigureCompat(hFig);
 end
 
-% å¤åˆ¶åæ ‡è½´å†…å®¹åŠæ ·å¼åˆ°ç›®æ ‡è½´
+% ¸´ÖÆ×ø±êÖáÄÚÈÝ¼°ÑùÊ½µ½Ä¿±êÖá
 function copyAxisContent(sourceAx, targetAx, legendLoc)
 if nargin < 3 || isempty(legendLoc)
     legendLoc = 'northeast';
@@ -3456,7 +3897,7 @@ end
 set(h, 'Value', unique(idx, 'stable'));
 end
 
-% åˆ¤æ–­å‘é‡æ˜¯å¦åƒæ—¶é—´è½´ï¼ˆå•è°ƒé€’å¢žä¸”æ­¥é•¿è¿‘ä¼¼æ’å®šï¼‰
+% ÅÐ¶ÏÏòÁ¿ÊÇ·ñÏñÊ±¼äÖá£¨µ¥µ÷µÝÔöÇÒ²½³¤½üËÆºã¶¨£©
 function tf = isTimeLike(v)
 v = v(:);
 if numel(v) < 3 || any(~isfinite(v))
@@ -3474,7 +3915,7 @@ if isempty(fs) || ~isfinite(fs) || fs <= 0
 end
 end
 
-% è®¡ç®—å•è¾¹å¹…å€¼è°±ï¼ˆFFTï¼?
+% ¼ÆËãµ¥±ß·ùÖµÆ×£¨FFT£©
 function [f, amp] = singleSideSpectrum(y, fs)
 y = y(:);
 N = numel(y);
@@ -3513,7 +3954,7 @@ catch
 end
 end
 
-% èŽ·å–ä¸‹æ‹‰æ¡†å½“å‰é€‰ä¸­çš„å›¾ç±»åž‹å­—ç¬¦ä¸?
+% »ñÈ¡ÏÂÀ­¿òµ±Ç°Ñ¡ÖÐµÄÍ¼ÀàÐÍ×Ö·û´®
 function mode = getPopupSelection(h)
 items = getCellStringCompat(get(h, 'String'));
 idx = get(h, 'Value');
@@ -3573,7 +4014,7 @@ labels = items(idx);
 labels = labels(~cellfun(@isempty, labels));
 end
 
-% å…¼å®¹ char/cell/string çš„å­—ç¬¦ä¸²åˆ—è¡¨è½¬æ¢
+% ¼æÈÝ char/cell/string µÄ×Ö·û´®ÁÐ±í×ª»»
 function items = getCellStringCompat(raw)
 if isempty(raw)
     items = {};
@@ -3600,7 +4041,7 @@ catch
 end
 end
 
-% å…¼å®¹åˆ¤æ–­â€œæ˜¯å¦ä¸ºæ–‡æœ¬æ ‡é‡â€?
+% ¼æÈÝÅÐ¶Ï¡°ÊÇ·ñÎªÎÄ±¾±êÁ¿¡±
 function tf = isTextScalarCompat(v)
 tf = ischar(v);
 if tf
@@ -3664,3 +4105,11 @@ try
 catch
 end
 end
+
+
+
+
+
+
+
+

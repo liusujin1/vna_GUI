@@ -122,6 +122,10 @@ chkHigh = uicontrol('Parent', panel, 'Style', 'checkbox', ...
     'String', '高通', ...
     'Value', 0, ...
     'Position', [160 560 90 22]);
+chkDetrend = uicontrol('Parent', panel, 'Style', 'checkbox', ...
+    'String', '去趋势', ...
+    'Value', 0, ...
+    'Position', [250 560 90 22]);
 
 lblLowCutoff = uicontrol('Parent', panel, 'Style', 'text', ...
     'String', 'LP (Hz):', ...
@@ -236,7 +240,7 @@ set([btnLoad, btnLoadFolder, edtFile, lblDataList, lstData, lblRename, edtRename
 
 set([lblFs, edtFs, lblTStart, edtTStart, lblTEnd, edtTEnd, lblPsdSource, ddPsdSource, ...
     lblQuantity, ddQuantity, ...
-    lblFilter, chkLow, chkHigh, lblLowCutoff, edtLowCutoff, lblHighCutoff, edtHighCutoff, ...
+    lblFilter, chkLow, chkHigh, chkDetrend, lblLowCutoff, edtLowCutoff, lblHighCutoff, edtHighCutoff, ...
     lblOrder, edtOrder, btnReset], 'Parent', grpMainProc);
 set(btnReset, 'String', '重置');
 
@@ -661,8 +665,9 @@ onResize();
 
             resetW = 58;
             set(lblFilter, 'Position', [gx, gy - rowH + 4, 45, 22]);
-            set(chkLow, 'Position', [gx + 48, gy - rowH + 2, 82, 22]);
-            set(chkHigh, 'Position', [gx + 130, gy - rowH + 2, 86, 22]);
+            set(chkLow, 'Position', [gx + 48, gy - rowH + 2, 62, 22]);
+            set(chkHigh, 'Position', [gx + 108, gy - rowH + 2, 62, 22]);
+            set(chkDetrend, 'Position', [gx + 168, gy - rowH + 2, 70, 22]);
             set(btnReset, 'Position', [gx + innerW - resetW, gy - rowH + 1, resetW, 24]);
             gy = gy - rowH - rowGap;
 
@@ -913,22 +918,22 @@ onResize();
         loadedNow = 0;
         failedNow = 0;
         lastErr = '';
-        for i = 1:numel(fileList)
-            oneFile = fileList{i};
-            fullName = fullfile(rootPath, oneFile);
-            try
-                D = readVibrationFile(fullName, getNumericControlValue(edtFs, 1000));
-                D.filePath = fullName;
-                D.fileName = getSeriesDisplayFileName(oneFile);
-                D.id = app.nextFileId;
-                app.nextFileId = app.nextFileId + 1;
-                app.files{end + 1} = D;
-                app.loaded = true;
-                loadedNow = loadedNow + 1;
-            catch ME
+        fsHint = getNumericControlValue(edtFs, 1000);
+        [records, errMsgs] = loadFilesMaybeParallel(fileList, rootPath, fsHint);
+        for i = 1:numel(records)
+            if isempty(records{i})
                 failedNow = failedNow + 1;
-                lastErr = ME.message;
+                if i <= numel(errMsgs) && ~isempty(errMsgs{i})
+                    lastErr = errMsgs{i};
+                end
+                continue;
             end
+            D = records{i};
+            D.id = app.nextFileId;
+            app.nextFileId = app.nextFileId + 1;
+            app.files{end + 1} = D;
+            app.loaded = true;
+            loadedNow = loadedNow + 1;
         end
     end
 
@@ -1258,6 +1263,7 @@ onResize();
         app = setCustomSeriesScale(app, seriesFileId, S.ch, scaleValue);
         setappdata(fig, 'app', app);
         set(lblStatus, 'String', sprintf('状态: 已将“%s”的系数更新为 %g', S.label, scaleValue));
+        refreshMainPlotsFromSelection();
     end
 
     % 列表选择变化时，同步刷新 Rename/Factor 输入框显示
@@ -1271,6 +1277,19 @@ onResize();
             set(edtRename, 'String', '');
             set(edtScale, 'String', '1');
         end
+        refreshMainPlotsFromSelection();
+    end
+
+    function refreshMainPlotsFromSelection()
+        app = getappdata(fig, 'app');
+        if ~app.loaded || isempty(app.files) || isFoundationTabSelected(tabRight, tabFoundation)
+            return;
+        end
+        selectedSeries = getSelectedSeries(app.series, getSelectedListLabels(lstData));
+        if isempty(selectedSeries)
+            return;
+        end
+        onPlot([], []);
     end
 
     % 按 mode 在指定坐标轴上绘图（Time/PSD/Trans 等）
@@ -1297,15 +1316,18 @@ onResize();
                     if isempty(yRaw)
                         continue;
                     end
-                    yDraw = applyFilterToSignal( ...
+                    scaleValue = getSeriesScale(app, S);
+                    [yDraw, trimSamples] = applyFilterToSignal( ...
                         yRaw, F.fs, logical(get(chkLow, 'Value')), getNumericControlValue(edtLowCutoff, 100), ...
-                        logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), getNumericControlValue(edtOrder, 4));
-                    yDraw = yDraw * getSeriesScale(app, S);
+                        logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), ...
+                        logical(get(chkDetrend, 'Value')), getNumericControlValue(edtOrder, 4));
+                    yDraw = yDraw * scaleValue;
                     N = min(numel(F.t), numel(yDraw));
                     if N < 2
                         continue;
                     end
-                    [tSeg, yAccSeg] = applyTimeWindow(F.t(1:N), yDraw(1:N), timeWindow);
+                    [tCrop, yCrop] = cropSignalEdges(F.t(1:N), yDraw(1:N), trimSamples);
+                    [tSeg, yAccSeg] = applyTimeWindow(tCrop, yCrop, timeWindow);
                     if numel(tSeg) < 2
                         continue;
                     end
@@ -1357,25 +1379,31 @@ onResize();
                 for si = 1:numel(selectedSeries)
                     S = selectedSeries{si};
                     F = app.files{S.fileIdx};
+                    scaleValue = getSeriesScale(app, S);
                     if usePeriodogramFromTime
                         yRaw = safeCellGet(F.rawByCh, S.ch);
                         if isempty(yRaw)
                             continue;
                         end
-                        yProc = applyFilterToSignal( ...
+                        [yProc, trimSamples] = applyFilterToSignal( ...
                             yRaw, F.fs, logical(get(chkLow, 'Value')), getNumericControlValue(edtLowCutoff, 100), ...
-                            logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), getNumericControlValue(edtOrder, 4));
+                            logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), ...
+                            logical(get(chkDetrend, 'Value')), getNumericControlValue(edtOrder, 4));
                         N = min(numel(F.t), numel(yProc));
                         if N < 2
                             continue;
                         end
-                        [~, ySeg] = applyTimeWindow(F.t(1:N), yProc(1:N), timeWindow);
+                        [tCrop, yCrop] = cropSignalEdges(F.t(1:N), yProc(1:N) * scaleValue, trimSamples);
+                        [~, ySeg] = applyTimeWindow(tCrop, yCrop, timeWindow);
                         if numel(ySeg) < 2
                             continue;
                         end
                         [f, psdAcc] = computePeriodogramPsd(ySeg, F.fs);
                     else
                         [f, psdAcc] = getPsdForChannel(F, S.ch);
+                        if ~isempty(psdAcc)
+                            psdAcc = psdAcc * (scaleValue ^ 2);
+                        end
                     end
                     if isempty(f)
                         continue;
@@ -1430,25 +1458,31 @@ onResize();
                 for si = 1:numel(selectedSeries)
                     S = selectedSeries{si};
                     F = app.files{S.fileIdx};
+                    scaleValue = getSeriesScale(app, S);
                     if usePeriodogramFromTime
                         yRaw = safeCellGet(F.rawByCh, S.ch);
                         if isempty(yRaw)
                             continue;
                         end
-                        yProc = applyFilterToSignal( ...
+                        [yProc, trimSamples] = applyFilterToSignal( ...
                             yRaw, F.fs, logical(get(chkLow, 'Value')), getNumericControlValue(edtLowCutoff, 100), ...
-                            logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), getNumericControlValue(edtOrder, 4));
+                            logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), ...
+                            logical(get(chkDetrend, 'Value')), getNumericControlValue(edtOrder, 4));
                         N = min(numel(F.t), numel(yProc));
                         if N < 2
                             continue;
                         end
-                        [~, ySeg] = applyTimeWindow(F.t(1:N), yProc(1:N), timeWindow);
+                        [tCrop, yCrop] = cropSignalEdges(F.t(1:N), yProc(1:N) * scaleValue, trimSamples);
+                        [~, ySeg] = applyTimeWindow(tCrop, yCrop, timeWindow);
                         if numel(ySeg) < 2
                             continue;
                         end
                         [f, psdAcc] = computePeriodogramPsd(ySeg, F.fs);
                     else
                         [f, psdAcc] = getPsdForChannel(F, S.ch);
+                        if ~isempty(psdAcc)
+                            psdAcc = psdAcc * (scaleValue ^ 2);
+                        end
                     end
                     if isempty(f)
                         continue;
@@ -1517,7 +1551,7 @@ onResize();
                         skippedSelfCount = skippedSelfCount + 1;
                         continue;
                     end
-                    [f, trDb] = getTransRatio(F, S.ch, refCh);
+                    [f, trDb] = getTransRatio(F, S.ch, refCh, getSeriesScale(app, S));
                     if isempty(f)
                         skippedMissingCount = skippedMissingCount + 1;
                         continue;
@@ -1624,6 +1658,7 @@ onResize();
     function onResetFilter(~, ~)
         set(chkLow, 'Value', 0);
         set(chkHigh, 'Value', 0);
+        set(chkDetrend, 'Value', 0);
         set(lblStatus, 'String', '状态: 滤波已重置为关闭');
     end
 
@@ -1938,6 +1973,74 @@ switch ext
 end
 end
 
+function [records, errMsgs] = loadFilesMaybeParallel(fileList, rootPath, fsHint)
+nFiles = numel(fileList);
+records = cell(1, nFiles);
+errMsgs = cell(1, nFiles);
+if nFiles == 0
+    return;
+end
+
+if ~shouldUseParallelFileLoad(nFiles)
+    for i = 1:nFiles
+        [records{i}, errMsgs{i}] = readOneFileRecord(rootPath, fileList{i}, fsHint);
+    end
+    return;
+end
+
+poolReady = ensureParallelPoolReady();
+if ~poolReady
+    for i = 1:nFiles
+        [records{i}, errMsgs{i}] = readOneFileRecord(rootPath, fileList{i}, fsHint);
+    end
+    return;
+end
+
+parfor i = 1:nFiles
+    [records{i}, errMsgs{i}] = readOneFileRecord(rootPath, fileList{i}, fsHint);
+end
+end
+
+function tf = shouldUseParallelFileLoad(nFiles)
+tf = false;
+if nFiles < 3
+    return;
+end
+if ~(license('test', 'Distrib_Computing_Toolbox') || license('test', 'Parallel_Computing_Toolbox'))
+    return;
+end
+tf = exist('parfor', 'builtin') == 5 || exist('parfor', 'file') == 2;
+end
+
+function tf = ensureParallelPoolReady()
+tf = false;
+try
+    if exist('gcp', 'file') == 2
+        pool = gcp('nocreate');
+        if isempty(pool)
+            parpool('local');
+        end
+        tf = true;
+        return;
+    end
+catch
+end
+end
+
+function [D, errMsg] = readOneFileRecord(rootPath, oneFile, fsHint)
+D = [];
+errMsg = '';
+fullName = fullfile(rootPath, oneFile);
+try
+    D = readVibrationFile(fullName, fsHint);
+    D.filePath = fullName;
+    D.fileName = getSeriesDisplayFileName(oneFile);
+catch ME
+    D = [];
+    errMsg = ME.message;
+end
+end
+
 % 解析 .vna/.mat 中的 SLm 结构，提取时域与频域数据
 function D = parseVnaLikeStruct(S, fsHint, D)
 slm = [];
@@ -2047,8 +2150,9 @@ D.vna = vna;
 end
 
 % 对时域信号应用低通/高通滤波，支持单独或同时使用
-function yDraw = applyFilterToSignal(yRaw, fs, useLow, lowCutoff, useHigh, highCutoff, order)
+function [yDraw, trimSamples] = applyFilterToSignal(yRaw, fs, useLow, lowCutoff, useHigh, highCutoff, useDetrend, order)
 yDraw = yRaw(:);
+trimSamples = 0;
 if isempty(yDraw) || ~isfinite(fs) || fs <= 0
     return;
 end
@@ -2061,20 +2165,135 @@ if useLow && useHigh && isfinite(lowCutoff) && isfinite(highCutoff) && highCutof
 end
 
 try
-    if useHigh && isfinite(highCutoff) && highCutoff > 0 && highCutoff < nyquist
-        wnHigh = highCutoff / nyquist;
-        [bHigh, aHigh] = butter(order, wnHigh, 'high');
-        yDraw = filtfilt(bHigh, aHigh, yDraw);
+    n = numel(yDraw);
+    if n < max(12, 3 * (order + 1))
+        return;
     end
 
-    if useLow && isfinite(lowCutoff) && lowCutoff > 0 && lowCutoff < nyquist
-        wnLow = lowCutoff / nyquist;
-        [bLow, aLow] = butter(order, wnLow, 'low');
-        yDraw = filtfilt(bLow, aLow, yDraw);
+    yWork = yDraw - mean(yDraw);
+    if useDetrend
+        yWork = detrend(yWork);
+    end
+
+    [sos, gain] = designButterFilter(order, nyquist, useLow, lowCutoff, useHigh, highCutoff);
+    if isempty(sos)
+        return;
+    end
+
+    sectionCount = size(sos, 1);
+    filtLen = max(3, 2 * sectionCount + 1);
+    padLen = min(floor((n - 1) / 2), max(3 * filtLen, 24));
+    if padLen >= 2
+        left = 2 * yWork(1) - yWork((padLen + 1):-1:2);
+        right = 2 * yWork(end) - yWork((end - 1):-1:(end - padLen));
+        yPad = [left; yWork; right];
+    else
+        yPad = yWork;
+    end
+
+    yFilt = zeroPhaseFilterBySections(yPad, sos, gain);
+    if padLen >= 2
+        yFilt = yFilt((padLen + 1):(padLen + n));
+    end
+
+    if numel(yFilt) == n && all(isfinite(yFilt))
+        yDraw = yFilt;
+        trimSamples = computeFilterTrimSamples(n, fs, useLow, lowCutoff, useHigh, highCutoff, order, padLen);
     end
 catch
     % If filtering fails (short signal, unstable coefficients), keep raw signal.
     yDraw = yRaw(:);
+    trimSamples = 0;
+end
+end
+
+function [sos, gain] = designButterFilter(order, nyquist, useLow, lowCutoff, useHigh, highCutoff)
+sos = [];
+gain = 1;
+
+if useHigh && isfinite(highCutoff) && highCutoff > 0 && highCutoff < nyquist && ...
+        useLow && isfinite(lowCutoff) && lowCutoff > 0 && lowCutoff < nyquist
+    wn = [highCutoff, lowCutoff] ./ nyquist;
+    if wn(1) <= 0 || wn(2) >= 1 || wn(1) >= wn(2)
+        return;
+    end
+    [z, p, k] = butter(order, wn, 'bandpass');
+    [sos, gain] = zp2sos(z, p, k);
+    return;
+end
+
+if useHigh && isfinite(highCutoff) && highCutoff > 0 && highCutoff < nyquist
+    wnHigh = highCutoff / nyquist;
+    [z, p, k] = butter(order, wnHigh, 'high');
+    [sos, gain] = zp2sos(z, p, k);
+    return;
+end
+
+if useLow && isfinite(lowCutoff) && lowCutoff > 0 && lowCutoff < nyquist
+    wnLow = lowCutoff / nyquist;
+    [z, p, k] = butter(order, wnLow, 'low');
+    [sos, gain] = zp2sos(z, p, k);
+    return;
+end
+end
+
+function yOut = zeroPhaseFilterBySections(yIn, sos, gain)
+yOut = yIn(:);
+if isempty(sos)
+    return;
+end
+for si = 1:size(sos, 1)
+    b = sos(si, 1:3);
+    a = sos(si, 4:6);
+    if si == 1 && isfinite(gain) && gain ~= 1
+        b = b * gain;
+    end
+    yOut = filtfilt(b, a, yOut);
+end
+end
+
+function trimSamples = computeFilterTrimSamples(n, fs, useLow, lowCutoff, useHigh, highCutoff, order, padLen)
+trimSamples = 0;
+if ~(useLow || useHigh) || ~isfinite(fs) || fs <= 0
+    return;
+end
+
+cutoffs = [];
+if useHigh && isfinite(highCutoff) && highCutoff > 0
+    cutoffs(end + 1) = highCutoff; %#ok<AGROW>
+end
+if useLow && isfinite(lowCutoff) && lowCutoff > 0
+    cutoffs(end + 1) = lowCutoff; %#ok<AGROW>
+end
+if isempty(cutoffs)
+    return;
+end
+
+edgeSec = max(order / max(cutoffs), 0.02);
+trimByFreq = ceil(edgeSec * fs);
+trimSamples = max(0, min([floor((n - 2) / 2), ceil(padLen / 2), trimByFreq]));
+end
+
+function [xCrop, yCrop] = cropSignalEdges(xIn, yIn, trimSamples)
+xCrop = xIn(:);
+yCrop = yIn(:);
+if isempty(xCrop) || isempty(yCrop)
+    return;
+end
+N = min(numel(xCrop), numel(yCrop));
+xCrop = xCrop(1:N);
+yCrop = yCrop(1:N);
+if ~isfinite(trimSamples) || trimSamples <= 0
+    return;
+end
+trimSamples = min(trimSamples, floor((N - 2) / 2));
+if trimSamples <= 0
+    return;
+end
+keepIdx = (trimSamples + 1):(N - trimSamples);
+if numel(keepIdx) >= 2
+    xCrop = xCrop(keepIdx);
+    yCrop = yCrop(keepIdx);
 end
 end
 
@@ -2107,9 +2326,12 @@ psd = psd(valid);
 end
 
 % 计算传递率（通道/参考通道）并转换为 dB
-function [f, trDb] = getTransRatio(F, ch, refCh)
+function [f, trDb] = getTransRatio(F, ch, refCh, scaleValue)
 f = [];
 trDb = [];
+if nargin < 4 || ~isfinite(scaleValue)
+    scaleValue = 1;
+end
 if ~F.vna.available
     return;
 end
@@ -2140,7 +2362,7 @@ if ~isfinite(euR) || euR == 0
     return;
 end
 xferCorr = x .* (euK / euR);
-trLin = abs(xferCorr);
+trLin = abs(xferCorr) * abs(scaleValue);
 valid = isfinite(f0) & isfinite(trLin) & (f0 > 0) & (trLin > 0);
 f = f0(valid);
 trDb = 20 * log10(trLin(valid));
@@ -3877,7 +4099,7 @@ if isempty(items)
     return;
 end
 if isempty(selectedLabels)
-    set(h, 'Value', 1:numel(items));
+    set(h, 'Value', 1);
     return;
 end
 

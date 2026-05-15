@@ -28,6 +28,8 @@ fig = figure( ...
 % 初始化应用状态，包括文件列表、数据项、滤波和自定义信息
 app = initAppState();
 app.lastOpenDir = pwd;
+app.suspendSelectionAutoPlot = false;
+app.plotFilterCache = struct('keys', {{}}, 'signals', {{}}, 'trim', []);
 setappdata(fig, 'app', app);
 
 % 左侧控制面板：文件加载、数据列表、重命名与滤波参数
@@ -882,9 +884,9 @@ onResize();
             fileList = fname;
         end
 
-        [app, loadedNow, failedNow, lastErr] = loadFilesByNameList(app, fileList, fpath);
+        [app, loadedNow, failedNow, lastErr, loadMode, loadElapsed] = loadFilesByNameList(app, fileList, fpath);
         app.lastOpenDir = fpath;
-        finalizeLoadResult(app, loadedNow, failedNow, lastErr, 'file(s)');
+        finalizeLoadResult(app, loadedNow, failedNow, lastErr, '文件', loadMode, loadElapsed);
     end
 
     % 主绘图入口：按所选数据项与图类型刷新三幅图
@@ -906,20 +908,24 @@ onResize();
             return;
         end
 
-        [app, loadedNow, failedNow, lastErr] = loadFilesByNameList(app, fileList, folderPath);
+        [app, loadedNow, failedNow, lastErr, loadMode, loadElapsed] = loadFilesByNameList(app, fileList, folderPath);
         app.lastOpenDir = folderPath;
-        finalizeLoadResult(app, loadedNow, failedNow, lastErr, 'file(s) from folder');
+        finalizeLoadResult(app, loadedNow, failedNow, lastErr, '文件夹中的文件', loadMode, loadElapsed);
     end
 
-    function [app, loadedNow, failedNow, lastErr] = loadFilesByNameList(app, fileList, rootPath)
+    function [app, loadedNow, failedNow, lastErr, loadMode, loadElapsed] = loadFilesByNameList(app, fileList, rootPath)
         set(lblStatus, 'String', sprintf('状态: 正在加载 %d 个文件...', numel(fileList)));
         drawnow;
 
         loadedNow = 0;
         failedNow = 0;
         lastErr = '';
+        loadMode = '串行';
+        loadElapsed = 0;
         fsHint = getNumericControlValue(edtFs, 1000);
-        [records, errMsgs] = loadFilesMaybeParallel(fileList, rootPath, fsHint);
+        ticLoad = tic;
+        [records, errMsgs, loadMode] = loadFilesMaybeParallel(fileList, rootPath, fsHint);
+        loadElapsed = toc(ticLoad);
         for i = 1:numel(records)
             if isempty(records{i})
                 failedNow = failedNow + 1;
@@ -937,7 +943,7 @@ onResize();
         end
     end
 
-    function finalizeLoadResult(app, loadedNow, failedNow, lastErr, srcLabel)
+    function finalizeLoadResult(app, loadedNow, failedNow, lastErr, srcLabel, loadMode, loadElapsed)
         if ~isempty(app.files)
             app.validChannels = collectValidChannels(app.files);
             app.fs = app.files{end}.fs;
@@ -945,8 +951,12 @@ onResize();
             app = rebuildSeriesList(app);
         end
 
+        app.suspendSelectionAutoPlot = true;
         setappdata(fig, 'app', app);
         refreshLoadedFilesList();
+        app = getappdata(fig, 'app');
+        app.suspendSelectionAutoPlot = false;
+        setappdata(fig, 'app', app);
         refreshFoundationFileSelectors();
 
         cla(axMain1); cla(axMain2); cla(axMain3);
@@ -963,10 +973,11 @@ onResize();
         end
 
         set(edtFile, 'String', summarizeLoadedFiles(app.files));
+        detailText = sprintf(' | %s | %.2f s', loadMode, loadElapsed);
         if failedNow > 0
-            set(lblStatus, 'String', sprintf('状态: 已加载 %d %s，失败 %d 个 | 最近错误: %s', loadedNow, srcLabel, failedNow, lastErr));
+            set(lblStatus, 'String', sprintf('状态: 已加载 %d %s，失败 %d 个%s | 最近错误: %s', loadedNow, srcLabel, failedNow, detailText, lastErr));
         else
-            set(lblStatus, 'String', sprintf('状态: 已加载 %d %s | 生成 %d 个数据项', loadedNow, srcLabel, numel(app.series)));
+            set(lblStatus, 'String', sprintf('状态: 已加载 %d %s | 生成 %d 个数据项%s', loadedNow, srcLabel, numel(app.series), detailText));
         end
     end
 
@@ -1087,6 +1098,8 @@ onResize();
 
         psdSourceMode = getPopupSelection(ddPsdSource);
         quantityMode = getQuantityMode(ddQuantity);
+        app.plotFilterCache = struct('keys', {{}}, 'signals', {{}}, 'trim', []);
+        setappdata(fig, 'app', app);
 
         refInput = 1;
         if ~keepExisting
@@ -1096,6 +1109,9 @@ onResize();
         [~, msg1] = renderOneAxis(axMain1, getPopupSelection(ddSel1), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode, quantityMode);
         [~, msg2] = renderOneAxis(axMain2, getPopupSelection(ddSel2), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode, quantityMode);
         [~, msg3] = renderOneAxis(axMain3, getPopupSelection(ddSel3), selectedSeries, app, refInput, keepExisting, timeWindow, psdSourceMode, quantityMode);
+        app = getappdata(fig, 'app');
+        app.plotFilterCache = struct('keys', {{}}, 'signals', {{}}, 'trim', []);
+        setappdata(fig, 'app', app);
         detailMsgs = {};
         if ~isempty(msg1)
             detailMsgs{end + 1} = msg1; %#ok<AGROW>
@@ -1277,7 +1293,9 @@ onResize();
             set(edtRename, 'String', '');
             set(edtScale, 'String', '1');
         end
-        refreshMainPlotsFromSelection();
+        if ~isfield(app, 'suspendSelectionAutoPlot') || ~app.suspendSelectionAutoPlot
+            refreshMainPlotsFromSelection();
+        end
     end
 
     function refreshMainPlotsFromSelection()
@@ -1290,6 +1308,33 @@ onResize();
             return;
         end
         onPlot([], []);
+    end
+
+    function [yProc, trimSamples] = getCachedFilteredSignal(seriesInfo, fileInfo)
+        app = getappdata(fig, 'app');
+        key = sprintf('%d|%d|%d|%.12g|%d|%.12g|%d|%d', ...
+            fileInfo.id, seriesInfo.ch, ...
+            logical(get(chkLow, 'Value')), getNumericControlValue(edtLowCutoff, 100), ...
+            logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), ...
+            logical(get(chkDetrend, 'Value')), getNumericControlValue(edtOrder, 4));
+        idx = find(strcmp(app.plotFilterCache.keys, key), 1, 'first');
+        if ~isempty(idx)
+            yProc = app.plotFilterCache.signals{idx};
+            trimSamples = app.plotFilterCache.trim(idx);
+            return;
+        end
+
+        yRaw = safeCellGet(fileInfo.rawByCh, seriesInfo.ch);
+        [yProc, trimSamples] = applyFilterToSignal( ...
+            yRaw, fileInfo.fs, logical(get(chkLow, 'Value')), getNumericControlValue(edtLowCutoff, 100), ...
+            logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), ...
+            logical(get(chkDetrend, 'Value')), getNumericControlValue(edtOrder, 4));
+
+        app = getappdata(fig, 'app');
+        app.plotFilterCache.keys{end + 1} = key;
+        app.plotFilterCache.signals{end + 1} = yProc;
+        app.plotFilterCache.trim(end + 1) = trimSamples;
+        setappdata(fig, 'app', app);
     end
 
     % 按 mode 在指定坐标轴上绘图（Time/PSD/Trans 等）
@@ -1312,15 +1357,11 @@ onResize();
                 for si = 1:numel(selectedSeries)
                     S = selectedSeries{si};
                     F = app.files{S.fileIdx};
-                    yRaw = safeCellGet(F.rawByCh, S.ch);
-                    if isempty(yRaw)
+                    scaleValue = getSeriesScale(app, S);
+                    [yDraw, trimSamples] = getCachedFilteredSignal(S, F);
+                    if isempty(yDraw)
                         continue;
                     end
-                    scaleValue = getSeriesScale(app, S);
-                    [yDraw, trimSamples] = applyFilterToSignal( ...
-                        yRaw, F.fs, logical(get(chkLow, 'Value')), getNumericControlValue(edtLowCutoff, 100), ...
-                        logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), ...
-                        logical(get(chkDetrend, 'Value')), getNumericControlValue(edtOrder, 4));
                     yDraw = yDraw * scaleValue;
                     N = min(numel(F.t), numel(yDraw));
                     if N < 2
@@ -1381,14 +1422,10 @@ onResize();
                     F = app.files{S.fileIdx};
                     scaleValue = getSeriesScale(app, S);
                     if usePeriodogramFromTime
-                        yRaw = safeCellGet(F.rawByCh, S.ch);
-                        if isempty(yRaw)
+                        [yProc, trimSamples] = getCachedFilteredSignal(S, F);
+                        if isempty(yProc)
                             continue;
                         end
-                        [yProc, trimSamples] = applyFilterToSignal( ...
-                            yRaw, F.fs, logical(get(chkLow, 'Value')), getNumericControlValue(edtLowCutoff, 100), ...
-                            logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), ...
-                            logical(get(chkDetrend, 'Value')), getNumericControlValue(edtOrder, 4));
                         N = min(numel(F.t), numel(yProc));
                         if N < 2
                             continue;
@@ -1460,14 +1497,10 @@ onResize();
                     F = app.files{S.fileIdx};
                     scaleValue = getSeriesScale(app, S);
                     if usePeriodogramFromTime
-                        yRaw = safeCellGet(F.rawByCh, S.ch);
-                        if isempty(yRaw)
+                        [yProc, trimSamples] = getCachedFilteredSignal(S, F);
+                        if isempty(yProc)
                             continue;
                         end
-                        [yProc, trimSamples] = applyFilterToSignal( ...
-                            yRaw, F.fs, logical(get(chkLow, 'Value')), getNumericControlValue(edtLowCutoff, 100), ...
-                            logical(get(chkHigh, 'Value')), getNumericControlValue(edtHighCutoff, 5), ...
-                            logical(get(chkDetrend, 'Value')), getNumericControlValue(edtOrder, 4));
                         N = min(numel(F.t), numel(yProc));
                         if N < 2
                             continue;
@@ -1973,22 +2006,23 @@ switch ext
 end
 end
 
-function [records, errMsgs] = loadFilesMaybeParallel(fileList, rootPath, fsHint)
+function [records, errMsgs, loadMode] = loadFilesMaybeParallel(fileList, rootPath, fsHint)
 nFiles = numel(fileList);
 records = cell(1, nFiles);
 errMsgs = cell(1, nFiles);
+loadMode = '串行';
 if nFiles == 0
     return;
 end
 
-if ~shouldUseParallelFileLoad(nFiles)
+if ~shouldUseParallelFileLoad(nFiles, rootPath)
     for i = 1:nFiles
         [records{i}, errMsgs{i}] = readOneFileRecord(rootPath, fileList{i}, fsHint);
     end
     return;
 end
 
-poolReady = ensureParallelPoolReady();
+poolReady = hasReadyParallelPool();
 if ~poolReady
     for i = 1:nFiles
         [records{i}, errMsgs{i}] = readOneFileRecord(rootPath, fileList{i}, fsHint);
@@ -1996,35 +2030,51 @@ if ~poolReady
     return;
 end
 
+loadMode = '并行';
 parfor i = 1:nFiles
     [records{i}, errMsgs{i}] = readOneFileRecord(rootPath, fileList{i}, fsHint);
 end
 end
 
-function tf = shouldUseParallelFileLoad(nFiles)
+function tf = shouldUseParallelFileLoad(nFiles, rootPath)
 tf = false;
-if nFiles < 3
+if nFiles < 12
     return;
 end
 if ~(license('test', 'Distrib_Computing_Toolbox') || license('test', 'Parallel_Computing_Toolbox'))
     return;
 end
-tf = exist('parfor', 'builtin') == 5 || exist('parfor', 'file') == 2;
+if ~(exist('parfor', 'builtin') == 5 || exist('parfor', 'file') == 2)
+    return;
+end
+if isLikelyNetworkPath(rootPath)
+    return;
+end
+tf = true;
 end
 
-function tf = ensureParallelPoolReady()
+function tf = hasReadyParallelPool()
 tf = false;
 try
     if exist('gcp', 'file') == 2
         pool = gcp('nocreate');
-        if isempty(pool)
-            parpool('local');
-        end
-        tf = true;
-        return;
+        tf = ~isempty(pool);
     end
 catch
 end
+end
+
+function tf = isLikelyNetworkPath(rootPath)
+tf = false;
+if ~ischar(rootPath) || isempty(rootPath)
+    return;
+end
+if strncmp(rootPath, '\\', 2) || strncmp(rootPath, '//', 2)
+    tf = true;
+    return;
+end
+rootLower = lower(rootPath);
+tf = ~isempty(strfind(rootLower, 'nas')) || ~isempty(strfind(rootLower, 'onedrive'));
 end
 
 function [D, errMsg] = readOneFileRecord(rootPath, oneFile, fsHint)
@@ -2175,13 +2225,12 @@ try
         yWork = detrend(yWork);
     end
 
-    [sos, gain] = designButterFilter(order, nyquist, useLow, lowCutoff, useHigh, highCutoff);
-    if isempty(sos)
+    [b, a, cutoffRef] = designButterFilter(order, nyquist, useLow, lowCutoff, useHigh, highCutoff);
+    if isempty(b) || isempty(a)
         return;
     end
 
-    sectionCount = size(sos, 1);
-    filtLen = max(3, 2 * sectionCount + 1);
+    filtLen = max(numel(a), numel(b));
     padLen = min(floor((n - 1) / 2), max(3 * filtLen, 24));
     if padLen >= 2
         left = 2 * yWork(1) - yWork((padLen + 1):-1:2);
@@ -2191,14 +2240,14 @@ try
         yPad = yWork;
     end
 
-    yFilt = zeroPhaseFilterBySections(yPad, sos, gain);
+    yFilt = filtfilt(b, a, yPad);
     if padLen >= 2
         yFilt = yFilt((padLen + 1):(padLen + n));
     end
 
     if numel(yFilt) == n && all(isfinite(yFilt))
         yDraw = yFilt;
-        trimSamples = computeFilterTrimSamples(n, fs, useLow, lowCutoff, useHigh, highCutoff, order, padLen);
+        trimSamples = computeFilterTrimSamples(n, fs, cutoffRef, order, padLen);
     end
 catch
     % If filtering fails (short signal, unstable coefficients), keep raw signal.
@@ -2207,9 +2256,10 @@ catch
 end
 end
 
-function [sos, gain] = designButterFilter(order, nyquist, useLow, lowCutoff, useHigh, highCutoff)
-sos = [];
-gain = 1;
+function [b, a, cutoffRef] = designButterFilter(order, nyquist, useLow, lowCutoff, useHigh, highCutoff)
+b = [];
+a = [];
+cutoffRef = [];
 
 if useHigh && isfinite(highCutoff) && highCutoff > 0 && highCutoff < nyquist && ...
         useLow && isfinite(lowCutoff) && lowCutoff > 0 && lowCutoff < nyquist
@@ -2217,59 +2267,38 @@ if useHigh && isfinite(highCutoff) && highCutoff > 0 && highCutoff < nyquist && 
     if wn(1) <= 0 || wn(2) >= 1 || wn(1) >= wn(2)
         return;
     end
-    [z, p, k] = butter(order, wn, 'bandpass');
-    [sos, gain] = zp2sos(z, p, k);
+    [b, a] = butter(order, wn, 'bandpass');
+    cutoffRef = wn * nyquist;
     return;
 end
 
 if useHigh && isfinite(highCutoff) && highCutoff > 0 && highCutoff < nyquist
     wnHigh = highCutoff / nyquist;
-    [z, p, k] = butter(order, wnHigh, 'high');
-    [sos, gain] = zp2sos(z, p, k);
+    [b, a] = butter(order, wnHigh, 'high');
+    cutoffRef = highCutoff;
     return;
 end
 
 if useLow && isfinite(lowCutoff) && lowCutoff > 0 && lowCutoff < nyquist
     wnLow = lowCutoff / nyquist;
-    [z, p, k] = butter(order, wnLow, 'low');
-    [sos, gain] = zp2sos(z, p, k);
+    [b, a] = butter(order, wnLow, 'low');
+    cutoffRef = lowCutoff;
     return;
 end
 end
 
-function yOut = zeroPhaseFilterBySections(yIn, sos, gain)
-yOut = yIn(:);
-if isempty(sos)
-    return;
-end
-for si = 1:size(sos, 1)
-    b = sos(si, 1:3);
-    a = sos(si, 4:6);
-    if si == 1 && isfinite(gain) && gain ~= 1
-        b = b * gain;
-    end
-    yOut = filtfilt(b, a, yOut);
-end
-end
-
-function trimSamples = computeFilterTrimSamples(n, fs, useLow, lowCutoff, useHigh, highCutoff, order, padLen)
+function trimSamples = computeFilterTrimSamples(n, fs, cutoffRef, order, padLen)
 trimSamples = 0;
-if ~(useLow || useHigh) || ~isfinite(fs) || fs <= 0
+if isempty(cutoffRef) || ~isfinite(fs) || fs <= 0
     return;
 end
 
-cutoffs = [];
-if useHigh && isfinite(highCutoff) && highCutoff > 0
-    cutoffs(end + 1) = highCutoff; %#ok<AGROW>
-end
-if useLow && isfinite(lowCutoff) && lowCutoff > 0
-    cutoffs(end + 1) = lowCutoff; %#ok<AGROW>
-end
-if isempty(cutoffs)
+cutoffMin = min(cutoffRef(:));
+if ~isfinite(cutoffMin) || cutoffMin <= 0
     return;
 end
 
-edgeSec = max(order / max(cutoffs), 0.02);
+edgeSec = max(order / cutoffMin, 0.02);
 trimByFreq = ceil(edgeSec * fs);
 trimSamples = max(0, min([floor((n - 2) / 2), ceil(padLen / 2), trimByFreq]));
 end
